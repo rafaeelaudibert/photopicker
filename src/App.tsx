@@ -3,11 +3,19 @@ import { Cell } from './Cell'
 import { Preview } from './Preview'
 import { TopBar } from './TopBar'
 import { DEFAULT_FIELDS, type FieldId } from './exif'
-import { ensureReadPermission, pickSourceFolder, scanFolder, supportsFileSystemAccess } from './fs'
+import {
+  copyToFolder,
+  ensureReadPermission,
+  pickDestFolder,
+  pickSourceFolder,
+  scanFolder,
+  supportsFileSystemAccess,
+} from './fs'
 import { clearHandle, loadHandle, saveHandle } from './idb'
 import type { Filter, PhotoItem } from './types'
 
 const picksKey = (folder: string) => `photopicker:picks:${folder}`
+const TARGET_KEY = 'photopicker:target'
 const SIZE_KEY = 'photopicker:cellsize'
 const WIDTH_KEY = 'photopicker:gridwidth'
 const FIELDS_KEY = 'photopicker:fields'
@@ -29,6 +37,7 @@ export default function App() {
   const [folderName, setFolderName] = useState('')
   const [items, setItems] = useState<PhotoItem[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [target, setTarget] = useState(() => readNumber(TARGET_KEY, 100))
   const [cellSize, setCellSize] = useState(() => readNumber(SIZE_KEY, 150))
   const [gridWidth, setGridWidth] = useState(() => readNumber(WIDTH_KEY, 460))
   const [fields, setFields] = useState<FieldId[]>(readFields)
@@ -38,6 +47,8 @@ export default function App() {
   const [showInfo, setShowInfo] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const [scanning, setScanning] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState<{ label: string; text: string } | null>(null)
   const [resumable, setResumable] = useState<FileSystemDirectoryHandle | null>(null)
 
   const gridRef = useRef<HTMLDivElement>(null)
@@ -47,6 +58,7 @@ export default function App() {
     loadHandle().then((h) => h && setResumable(h)).catch(() => {})
   }, [])
 
+  useEffect(() => localStorage.setItem(TARGET_KEY, String(target)), [target])
   useEffect(() => localStorage.setItem(SIZE_KEY, String(cellSize)), [cellSize])
   useEffect(() => localStorage.setItem(WIDTH_KEY, String(gridWidth)), [gridWidth])
   useEffect(() => localStorage.setItem(FIELDS_KEY, JSON.stringify(fields)), [fields])
@@ -54,6 +66,12 @@ export default function App() {
   useEffect(() => {
     if (folderName) localStorage.setItem(picksKey(folderName), JSON.stringify([...picked]))
   }, [picked, folderName])
+
+  useEffect(() => {
+    if (!toast || busy) return
+    const t = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(t)
+  }, [toast, busy])
 
   const openFolder = useCallback(async (handle: FileSystemDirectoryHandle) => {
     if (!(await ensureReadPermission(handle))) return
@@ -198,6 +216,29 @@ export default function App() {
     window.addEventListener('pointerup', stop)
   }
 
+  const exportPicks = useCallback(async () => {
+    const chosen = items.filter((i) => picked.has(i.key))
+    if (!chosen.length) return
+    let dest: FileSystemDirectoryHandle
+    try {
+      dest = await pickDestFolder()
+    } catch {
+      return
+    }
+    setBusy(true)
+    setToast({ label: 'Copying', text: `0 of ${chosen.length}` })
+    try {
+      await copyToFolder(dest, chosen, (done, total) =>
+        setToast({ label: 'Copying', text: `${done} of ${total}` }),
+      )
+      setToast({ label: 'Done', text: `${chosen.length} photos copied to ${dest.name}` })
+    } catch (err) {
+      setToast({ label: 'Copy failed', text: String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }, [items, picked])
+
   if (!supported) {
     return (
       <div className="app">
@@ -254,14 +295,18 @@ export default function App() {
         folderName={folderName}
         total={items.length}
         pickedCount={picked.size}
+        target={target}
         filter={filter}
         cellSize={cellSize}
+        busy={busy}
+        onTargetChange={setTarget}
         onFilterChange={setFilter}
         onCellSizeChange={setCellSize}
         onChangeFolder={() => {
           clearHandle().catch(() => {})
           chooseFolder()
         }}
+        onExport={exportPicks}
       />
 
       <div className="work">
@@ -315,6 +360,13 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {toast && (
+        <div className="toast" role="status">
+          <span className="label">{toast.label}</span>
+          <span>{toast.text}</span>
+        </div>
+      )}
     </div>
   )
 }

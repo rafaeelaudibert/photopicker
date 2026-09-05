@@ -18,8 +18,10 @@
   --cell: 150px;
   color-scheme: dark;
 }
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
+
 body {
   margin: 0;
   background: var(--sheet);
@@ -29,7 +31,9 @@ body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
+
 button { font: inherit; color: inherit; cursor: pointer; }
+
 .label {
   font-size: 9.5px;
   font-weight: 600;
@@ -37,24 +41,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-transform: uppercase;
   color: var(--dim);
 }
+
 .app { display: flex; flex-direction: column; height: 100%; }
 
-/* ---------- controls ---------- */
-.btn {
-  padding: 7px 13px;
-  background: var(--raised);
-  border: 1px solid var(--edge);
-  border-radius: 5px;
-  font-size: 12.5px;
-  transition: background 120ms, border-color 120ms;
-}
-.btn:hover:not(:disabled) { background: #2b2822; border-color: #3d382e; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn[aria-pressed='true'] { border-color: var(--faint); color: var(--bone); }
-.btn-primary { background: var(--brass); border-color: var(--brass); color: #17150f; font-weight: 600; flex: none; }
-.btn-primary:hover:not(:disabled) { background: #dcb42e; border-color: #dcb42e; }
-
 /* ---------- top bar ---------- */
+
 .bar {
   display: flex;
   align-items: center;
@@ -64,6 +55,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-bottom: 1px solid var(--edge);
   flex: none;
 }
+
 .bar-folder {
   flex: 1;
   min-width: 0;
@@ -81,7 +73,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: color 120ms, border-color 120ms;
 }
 .bar-folder:hover { color: var(--bone); border-color: var(--edge); }
+
 .filters { display: flex; gap: 2px; background: var(--raised); padding: 2px; border-radius: 6px; flex: none; }
+
 .filter {
   display: flex;
   align-items: baseline;
@@ -98,6 +92,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .filter[aria-pressed='true'] { background: var(--sheet); color: var(--bone); }
 .filter-count { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .filter[aria-pressed='true'] .filter-count { color: var(--brass); }
+
 .zoom {
   width: 88px;
   height: 3px;
@@ -117,9 +112,54 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .zoom:hover::-webkit-slider-thumb { background: var(--bone); }
 
+/* The frame counter is the signature: tabular numerals, brass, oversized. */
+.quota { flex: none; }
+
+.counter { display: flex; align-items: baseline; gap: 5px; font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1; }
+.counter-picked { font-size: 24px; font-weight: 600; color: var(--brass); letter-spacing: -0.02em; }
+.counter.over .counter-picked { color: var(--rust); }
+.counter-slash { font-size: 15px; color: var(--faint); }
+
+.counter-target {
+  font: inherit;
+  font-size: 15px;
+  width: 4ch;
+  padding: 1px 3px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.counter-target::-webkit-inner-spin-button { appearance: none; }
+.counter-target:hover { border-color: var(--edge); }
+.counter-target:focus { outline: none; border-color: var(--brass); color: var(--bone); }
+
+.gauge { width: 140px; height: 2px; margin-top: 6px; background: var(--raised); border-radius: 2px; overflow: hidden; }
+.gauge-fill { height: 100%; background: var(--brass); transition: width 180ms ease-out; }
+.gauge-fill.over { background: var(--rust); }
+.over-note { margin-top: 4px; font-size: 10.5px; color: var(--rust); font-variant-numeric: tabular-nums; }
+
+.btn {
+  padding: 7px 13px;
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  font-size: 12.5px;
+  transition: background 120ms, border-color 120ms;
+}
+.btn:hover:not(:disabled) { background: #2b2822; border-color: #3d382e; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn[aria-pressed='true'] { border-color: var(--faint); color: var(--bone); }
+.btn-primary { background: var(--brass); border-color: var(--brass); color: #17150f; font-weight: 600; flex: none; }
+.btn-primary:hover:not(:disabled) { background: #dcb42e; border-color: #dcb42e; }
+
 /* ---------- split work area ---------- */
+
 .work { flex: 1; display: flex; min-height: 0; }
+
 .preview { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage); }
+
 .preview-stage {
   flex: 1;
   min-height: 0;
@@ -132,6 +172,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .preview-stage.actual { place-items: start; }
 .preview-stage.actual img { max-width: none; max-height: none; cursor: zoom-out; }
 .preview-blank { color: var(--faint); font-size: 13px; }
+
 .preview-bar {
   flex: none;
   display: flex;
@@ -145,6 +186,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-pick.on { background: var(--bone); border-color: var(--bone); color: #17150f; font-weight: 600; }
 .preview-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-pos { font-family: var(--mono); font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
 /* EXIF strip, directly under the frame it describes. */
 .info {
   flex: none;
@@ -160,10 +202,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .info-row dt { flex: none; }
 .info-row dd { margin: 0; font-family: var(--mono); font-size: 11.5px; color: var(--bone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .info-empty { flex: 1; font-size: 11.5px; color: var(--faint); }
+
 .info-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; flex: 1; }
 .info-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); cursor: pointer; }
 .info-check input { accent-color: var(--brass); margin: 0; }
 .info-check:hover { color: var(--bone); }
+
 .info-edit {
   flex: none;
   padding: 3px 9px;
@@ -174,10 +218,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--dim);
 }
 .info-edit:hover { color: var(--bone); border-color: var(--faint); }
+
 .divider { flex: none; width: 6px; cursor: col-resize; background: var(--sheet); border-left: 1px solid var(--edge); }
 .divider:hover { background: var(--raised); }
 
 /* ---------- thumbnail grid ---------- */
+
 .grid {
   flex: none;
   overflow-y: auto;
@@ -192,6 +238,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   align-content: start;
   background: var(--sheet);
 }
+
 .cell {
   position: relative;
   height: 100%;
@@ -203,6 +250,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: border-color 120ms;
 }
 .cell:hover { border-color: #46402f; }
+
 .cell img {
   width: 100%;
   height: 100%;
@@ -215,9 +263,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: opacity 200ms ease-out;
 }
 .cell img.loaded { opacity: 1; }
+
 .cell.selected { border-color: var(--brass); }
 .cell.picked { border-color: var(--bone); }
 .cell.picked.selected { border-color: var(--brass); }
+
 /* Corner brackets, the way an editor marks up a proof sheet. */
 .cell.picked::before,
 .cell.picked::after {
@@ -230,6 +280,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .cell.picked::before { top: 4px; left: 4px; border-right: none; border-bottom: none; }
 .cell.picked::after { bottom: 4px; right: 4px; border-left: none; border-top: none; }
+
 .cell-pick {
   position: absolute;
   top: 4px;
@@ -250,6 +301,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .cell:hover .cell-pick { opacity: 1; }
 .cell.picked .cell-pick { opacity: 1; background: var(--bone); border-color: var(--bone); color: #17150f; }
+
 .cell-name {
   position: absolute;
   inset: auto 0 0 0;
@@ -268,11 +320,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cell:hover .cell-name { opacity: 1; }
 
 /* ---------- fullscreen ---------- */
+
 .app.fullscreen .divider,
 .app.fullscreen .grid { display: none; }
 .app.fullscreen .preview-stage { padding: 0; }
 
 /* ---------- intro, toast ---------- */
+
 .center { flex: 1; display: grid; place-items: center; padding: 40px; }
 .intro { max-width: 440px; text-align: center; }
 .intro h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 12px; }
@@ -288,6 +342,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 2px 5px;
   color: var(--dim);
 }
+
 .toast {
   /* Top of the stage, clear of the EXIF strip along the bottom. */
   position: fixed;
