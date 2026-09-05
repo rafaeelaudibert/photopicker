@@ -1,24 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Cell } from './Cell'
+import { Preview } from './Preview'
 import { TopBar } from './TopBar'
+import { DEFAULT_FIELDS, type FieldId } from './exif'
 import { ensureReadPermission, pickSourceFolder, scanFolder, supportsFileSystemAccess } from './fs'
 import { clearHandle, loadHandle, saveHandle } from './idb'
 import type { Filter, PhotoItem } from './types'
 
 const picksKey = (folder: string) => `photopicker:picks:${folder}`
 const SIZE_KEY = 'photopicker:cellsize'
+const WIDTH_KEY = 'photopicker:gridwidth'
+const FIELDS_KEY = 'photopicker:fields'
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const readNumber = (key: string, fallback: number) => Number(localStorage.getItem(key)) || fallback
+
+function readFields(): FieldId[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FIELDS_KEY) ?? 'null')
+    if (Array.isArray(stored)) return stored as FieldId[]
+  } catch {
+    /* fall through to defaults */
+  }
+  return [...DEFAULT_FIELDS]
+}
 
 export default function App() {
   const [folderName, setFolderName] = useState('')
   const [items, setItems] = useState<PhotoItem[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [cellSize, setCellSize] = useState(() => readNumber(SIZE_KEY, 150))
+  const [gridWidth, setGridWidth] = useState(() => readNumber(WIDTH_KEY, 460))
+  const [fields, setFields] = useState<FieldId[]>(readFields)
   const [filter, setFilter] = useState<Filter>('all')
   const [cursor, setCursor] = useState(0)
   const [rowHeight, setRowHeight] = useState(0)
+  const [showInfo, setShowInfo] = useState(true)
+  const [fullscreen, setFullscreen] = useState(false)
   const [scanning, setScanning] = useState<number | null>(null)
   const [resumable, setResumable] = useState<FileSystemDirectoryHandle | null>(null)
 
@@ -30,6 +48,9 @@ export default function App() {
   }, [])
 
   useEffect(() => localStorage.setItem(SIZE_KEY, String(cellSize)), [cellSize])
+  useEffect(() => localStorage.setItem(WIDTH_KEY, String(gridWidth)), [gridWidth])
+  useEffect(() => localStorage.setItem(FIELDS_KEY, JSON.stringify(fields)), [fields])
+
   useEffect(() => {
     if (folderName) localStorage.setItem(picksKey(folderName), JSON.stringify([...picked]))
   }, [picked, folderName])
@@ -129,9 +150,9 @@ export default function App() {
         case 'ArrowLeft':
           return move(-1)
         case 'ArrowDown':
-          return move(columnCount())
+          return move(fullscreen ? 1 : columnCount())
         case 'ArrowUp':
-          return move(-columnCount())
+          return move(fullscreen ? -1 : -columnCount())
         case 'Home':
           return move(-Infinity)
         case 'End':
@@ -142,6 +163,16 @@ export default function App() {
           e.preventDefault()
           if (view[cursor]) toggle(view[cursor].key)
           return
+        case 'Enter':
+        case 'f':
+        case 'F':
+          e.preventDefault()
+          return setFullscreen((v) => !v)
+        case 'Escape':
+          return setFullscreen(false)
+        case 'i':
+        case 'I':
+          return setShowInfo((v) => !v)
         case '1':
           return setFilter('all')
         case '2':
@@ -153,7 +184,19 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, cursor, items.length, toggle])
+  }, [view, cursor, fullscreen, items.length, toggle])
+
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const onMove = (ev: PointerEvent) =>
+      setGridWidth(clamp(window.innerWidth - ev.clientX, 200, window.innerWidth - 360))
+    const stop = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', stop)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', stop)
+  }
 
   if (!supported) {
     return (
@@ -192,7 +235,9 @@ export default function App() {
               )}
             </div>
             <div className="hint">
-              <kbd>click</kbd> pick · <kbd>space</kbd> pick · <kbd>←</kbd> <kbd>→</kbd> move ·{' '}
+              <kbd>click</kbd> select · <kbd>double-click</kbd> pick · <kbd>space</kbd> pick
+              <br />
+              <kbd>←</kbd> <kbd>→</kbd> move · <kbd>f</kbd> fullscreen · <kbd>i</kbd> info ·{' '}
               <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> filter
             </div>
           </div>
@@ -201,8 +246,10 @@ export default function App() {
     )
   }
 
+  const current = view[cursor]
+
   return (
-    <div className="app">
+    <div className={`app${fullscreen ? ' fullscreen' : ''}`}>
       <TopBar
         folderName={folderName}
         total={items.length}
@@ -218,6 +265,25 @@ export default function App() {
       />
 
       <div className="work">
+        <Preview
+          item={current}
+          position={cursor + 1}
+          total={view.length}
+          picked={!!current && picked.has(current.key)}
+          showInfo={showInfo}
+          fields={fields}
+          onFieldsChange={setFields}
+          onToggle={() => current && toggle(current.key)}
+        />
+
+        <div
+          className="divider"
+          onPointerDown={startResize}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the photo list"
+        />
+
         <div
           className="grid"
           ref={gridRef}
@@ -225,13 +291,18 @@ export default function App() {
             {
               '--cell': `${cellSize}px`,
               ...(rowHeight ? { '--row': `${rowHeight}px` } : {}),
+              width: gridWidth,
             } as CSSProperties
           }
           onClick={(e) => {
             const i = indexOfCell(e.target)
             if (i < 0) return
             setCursor(i)
-            toggle(view[i].key)
+            if ((e.target as Element).closest('.cell-pick')) toggle(view[i].key)
+          }}
+          onDoubleClick={(e) => {
+            const i = indexOfCell(e.target)
+            if (i >= 0 && !(e.target as Element).closest('.cell-pick')) toggle(view[i].key)
           }}
         >
           {view.map((item, i) => (
