@@ -42,3 +42,39 @@ export async function scanFolder(
   onProgress(items.length)
   return items.sort((a, b) => collator.compare(a.key, b.key))
 }
+
+/** Appends " (2)", " (3)"… when two source subfolders contain the same file name. */
+function uniqueName(name: string, taken: Set<string>): string {
+  const lower = name.toLowerCase()
+  if (!taken.has(lower)) {
+    taken.add(lower)
+    return name
+  }
+  const dot = name.lastIndexOf('.')
+  const stem = dot > 0 ? name.slice(0, dot) : name
+  const ext = dot > 0 ? name.slice(dot) : ''
+  for (let n = 2; ; n++) {
+    const candidate = `${stem} (${n})${ext}`
+    if (!taken.has(candidate.toLowerCase())) {
+      taken.add(candidate.toLowerCase())
+      return candidate
+    }
+  }
+}
+
+export async function copyToFolder(
+  dest: FileSystemDirectoryHandle,
+  items: PhotoItem[],
+  onProgress: (done: number, total: number) => void,
+): Promise<void> {
+  const taken = new Set<string>()
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const file = await item.handle.getFile()
+    const target = await dest.getFileHandle(uniqueName(item.name, taken), { create: true })
+    const writable = await target.createWritable()
+    await writable.write(file)
+    await writable.close()
+    onProgress(i + 1, items.length)
+  }
+}
