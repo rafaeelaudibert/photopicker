@@ -117,9 +117,69 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .zoom:hover::-webkit-slider-thumb { background: var(--bone); }
 
+/* ---------- split work area ---------- */
+.work { flex: 1; display: flex; min-height: 0; }
+.preview { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage); }
+.preview-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: auto;
+}
+.preview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
+.preview-stage.actual { place-items: start; }
+.preview-stage.actual img { max-width: none; max-height: none; cursor: zoom-out; }
+.preview-blank { color: var(--faint); font-size: 13px; }
+.preview-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--edge);
+}
+.btn-pick { min-width: 84px; text-align: center; }
+.btn-pick.on { background: var(--bone); border-color: var(--bone); color: #17150f; font-weight: 600; }
+.preview-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-pos { font-family: var(--mono); font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+/* EXIF strip, directly under the frame it describes. */
+.info {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--edge);
+}
+.info-rows { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; flex: 1; min-width: 0; }
+.info-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.info-row dt { flex: none; }
+.info-row dd { margin: 0; font-family: var(--mono); font-size: 11.5px; color: var(--bone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-empty { flex: 1; font-size: 11.5px; color: var(--faint); }
+.info-fields { display: flex; flex-wrap: wrap; gap: 6px 16px; flex: 1; }
+.info-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); cursor: pointer; }
+.info-check input { accent-color: var(--brass); margin: 0; }
+.info-check:hover { color: var(--bone); }
+.info-edit {
+  flex: none;
+  padding: 3px 9px;
+  background: none;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--dim);
+}
+.info-edit:hover { color: var(--bone); border-color: var(--faint); }
+.divider { flex: none; width: 6px; cursor: col-resize; background: var(--sheet); border-left: 1px solid var(--edge); }
+.divider:hover { background: var(--raised); }
+
 /* ---------- thumbnail grid ---------- */
 .grid {
-  flex: 1;
+  flex: none;
   overflow-y: auto;
   padding: 10px;
   display: grid;
@@ -206,6 +266,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   pointer-events: none;
 }
 .cell:hover .cell-name { opacity: 1; }
+
+/* ---------- fullscreen ---------- */
+.app.fullscreen .divider,
+.app.fullscreen .grid { display: none; }
+.app.fullscreen .preview-stage { padding: 0; }
 
 /* ---------- intro, toast ---------- */
 .center { flex: 1; display: grid; place-items: center; padding: 40px; }
