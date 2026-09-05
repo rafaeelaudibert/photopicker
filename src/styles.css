@@ -54,6 +54,159 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-primary { background: var(--brass); border-color: var(--brass); color: #17150f; font-weight: 600; flex: none; }
 .btn-primary:hover:not(:disabled) { background: #dcb42e; border-color: #dcb42e; }
 
+/* ---------- top bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 9px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--edge);
+  flex: none;
+}
+.bar-folder {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  margin-left: -8px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 120ms, border-color 120ms;
+}
+.bar-folder:hover { color: var(--bone); border-color: var(--edge); }
+.filters { display: flex; gap: 2px; background: var(--raised); padding: 2px; border-radius: 6px; flex: none; }
+.filter {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--dim);
+  transition: background 120ms, color 120ms;
+}
+.filter:hover { color: var(--bone); }
+.filter[aria-pressed='true'] { background: var(--sheet); color: var(--bone); }
+.filter-count { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.filter[aria-pressed='true'] .filter-count { color: var(--brass); }
+.zoom {
+  width: 88px;
+  height: 3px;
+  flex: none;
+  appearance: none;
+  background: var(--raised);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.zoom::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: background 120ms;
+}
+.zoom:hover::-webkit-slider-thumb { background: var(--bone); }
+
+/* ---------- thumbnail grid ---------- */
+.grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--cell), 1fr));
+  /* Rows are sized from the measured column width rather than inferred from the
+     cells. Chrome does not feed aspect-ratio into auto row sizing here, which
+     collapses every row to the border height and stacks the tiles. */
+  grid-auto-rows: var(--row, var(--cell));
+  gap: 8px;
+  align-content: start;
+  background: var(--sheet);
+}
+.cell {
+  position: relative;
+  height: 100%;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 120ms;
+}
+.cell:hover { border-color: #46402f; }
+.cell img {
+  width: 100%;
+  height: 100%;
+  background: var(--stage);
+  /* cover, because the grid is for scanning: uniform tiles read as an index.
+     The preview pane alongside shows the true, uncropped frame. */
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.cell img.loaded { opacity: 1; }
+.cell.selected { border-color: var(--brass); }
+.cell.picked { border-color: var(--bone); }
+.cell.picked.selected { border-color: var(--brass); }
+/* Corner brackets, the way an editor marks up a proof sheet. */
+.cell.picked::before,
+.cell.picked::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--bone);
+  pointer-events: none;
+}
+.cell.picked::before { top: 4px; left: 4px; border-right: none; border-bottom: none; }
+.cell.picked::after { bottom: 4px; right: 4px; border-left: none; border-top: none; }
+.cell-pick {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 10, 9, 0.72);
+  border: 1px solid var(--faint);
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--bone);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.cell:hover .cell-pick { opacity: 1; }
+.cell.picked .cell-pick { opacity: 1; background: var(--bone); border-color: var(--bone); color: #17150f; }
+.cell-name {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 14px 6px 4px;
+  background: linear-gradient(transparent, rgba(10, 9, 8, 0.9));
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 120ms;
+  pointer-events: none;
+}
+.cell:hover .cell-name { opacity: 1; }
+
 /* ---------- intro, toast ---------- */
 .center { flex: 1; display: grid; place-items: center; padding: 40px; }
 .intro { max-width: 440px; text-align: center; }
