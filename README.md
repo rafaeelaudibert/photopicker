@@ -58,10 +58,17 @@ come back to a half-finished cull. `Resume` reopens the last folder without re-p
 | `Esc` | Leave fullscreen |
 | `I` | Show or hide the EXIF strip |
 | `1` `2` `3` | All / Picked / Unpicked |
+| `?` | The full shortcut list |
 
 In the grid, click selects, double-click picks, and the badge in a tile's corner picks
 without changing the selection. Clicking the preview toggles actual-size zoom, which is
 how you check whether a frame is sharp enough to print large.
+
+You should not need this table. Every shortcut is printed on the control it drives, so
+the filters read `1 All`, the pick button reads `Pick P`, and so on. Press `?` for the
+complete list, mouse gestures included.
+
+![The shortcuts sheet](docs/shortcuts.png)
 
 ## EXIF
 

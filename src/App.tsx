@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Cell } from './Cell'
 import { Preview } from './Preview'
+import { Shortcuts } from './Shortcuts'
 import { TopBar } from './TopBar'
 import { DEFAULT_FIELDS, type FieldId } from './exif'
 import {
@@ -46,6 +47,7 @@ export default function App() {
   const [rowHeight, setRowHeight] = useState(0)
   const [showInfo, setShowInfo] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [scanning, setScanning] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ label: string; text: string } | null>(null)
@@ -156,6 +158,16 @@ export default function App() {
 
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return
+
+      if (e.key === '?') {
+        e.preventDefault()
+        return setShowShortcuts((v) => !v)
+      }
+      if (showShortcuts) {
+        if (e.key === 'Escape') setShowShortcuts(false)
+        return
+      }
+
       const last = view.length - 1
       const move = (delta: number) => {
         e.preventDefault()
@@ -202,7 +214,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, cursor, fullscreen, items.length, toggle])
+  }, [view, cursor, fullscreen, showShortcuts, items.length, toggle])
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -276,10 +288,10 @@ export default function App() {
               )}
             </div>
             <div className="hint">
-              <kbd>click</kbd> select · <kbd>double-click</kbd> pick · <kbd>space</kbd> pick
+              <kbd>click</kbd> select · <kbd>double-click</kbd> pick · <kbd>space</kbd> pick ·{' '}
+              <kbd>←</kbd> <kbd>→</kbd> move
               <br />
-              <kbd>←</kbd> <kbd>→</kbd> move · <kbd>f</kbd> fullscreen · <kbd>i</kbd> info ·{' '}
-              <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> filter
+              Press <kbd>?</kbd> at any time for the full list.
             </div>
           </div>
         </div>
@@ -307,6 +319,7 @@ export default function App() {
           chooseFolder()
         }}
         onExport={exportPicks}
+        onShowShortcuts={() => setShowShortcuts(true)}
       />
 
       <div className="work">
@@ -316,8 +329,11 @@ export default function App() {
           total={view.length}
           picked={!!current && picked.has(current.key)}
           showInfo={showInfo}
+          fullscreen={fullscreen}
           fields={fields}
           onFieldsChange={setFields}
+          onToggleInfo={() => setShowInfo((v) => !v)}
+          onToggleFullscreen={() => setFullscreen((v) => !v)}
           onToggle={() => current && toggle(current.key)}
         />
 
@@ -360,6 +376,8 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {showShortcuts && <Shortcuts onClose={() => setShowShortcuts(false)} />}
 
       {toast && (
         <div className="toast" role="status">

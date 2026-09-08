@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DEFAULT_FIELDS, FIELDS, formatBytes, readExif, type FieldId } from './exif'
+import { KEY } from './shortcut-list'
 import type { PhotoItem } from './types'
 
 interface Props {
@@ -8,8 +9,11 @@ interface Props {
   total: number
   picked: boolean
   showInfo: boolean
+  fullscreen: boolean
   fields: FieldId[]
   onFieldsChange: (fields: FieldId[]) => void
+  onToggleInfo: () => void
+  onToggleFullscreen: () => void
   onToggle: () => void
 }
 
@@ -99,6 +103,7 @@ export function Preview(p: Props) {
           onClick={p.onToggle}
         >
           {p.picked ? 'Picked' : 'Pick'}
+          <kbd className="kbd">{KEY.pick}</kbd>
         </button>
         <span className="preview-name" title={item.key}>
           {item.name}
@@ -106,6 +111,24 @@ export function Preview(p: Props) {
         <span className="preview-pos">
           {p.position} / {p.total}
         </span>
+        <button
+          type="button"
+          className="btn"
+          aria-pressed={p.showInfo}
+          onClick={p.onToggleInfo}
+        >
+          Info
+          <kbd className="kbd">{KEY.info}</kbd>
+        </button>
+        <button
+          type="button"
+          className="btn"
+          aria-pressed={p.fullscreen}
+          onClick={p.onToggleFullscreen}
+        >
+          {p.fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          <kbd className="kbd">{KEY.fullscreen}</kbd>
+        </button>
       </footer>
 
       {p.showInfo && (

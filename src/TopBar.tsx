@@ -1,3 +1,4 @@
+import { KEY } from './shortcut-list'
 import type { Filter } from './types'
 
 interface Props {
@@ -13,16 +14,17 @@ interface Props {
   onCellSizeChange: (n: number) => void
   onChangeFolder: () => void
   onExport: () => void
+  onShowShortcuts: () => void
 }
 
 export function TopBar(p: Props) {
   const over = p.pickedCount > p.target
   const fill = p.target > 0 ? Math.min(100, (p.pickedCount / p.target) * 100) : 0
 
-  const tabs: { id: Filter; text: string; count: number }[] = [
-    { id: 'all', text: 'All', count: p.total },
-    { id: 'picked', text: 'Picked', count: p.pickedCount },
-    { id: 'unpicked', text: 'Unpicked', count: p.total - p.pickedCount },
+  const tabs: { id: Filter; text: string; count: number; key: string }[] = [
+    { id: 'all', text: 'All', count: p.total, key: KEY.all },
+    { id: 'picked', text: 'Picked', count: p.pickedCount, key: KEY.picked },
+    { id: 'unpicked', text: 'Unpicked', count: p.total - p.pickedCount, key: KEY.unpicked },
   ]
 
   return (
@@ -45,6 +47,7 @@ export function TopBar(p: Props) {
             aria-pressed={p.filter === t.id}
             onClick={() => p.onFilterChange(t.id)}
           >
+            <kbd className="kbd">{t.key}</kbd>
             {t.text}
             <span className="filter-count">{t.count}</span>
           </button>
@@ -88,6 +91,16 @@ export function TopBar(p: Props) {
         disabled={p.pickedCount === 0 || p.busy}
       >
         Copy {p.pickedCount}
+      </button>
+
+      <button
+        type="button"
+        className="btn btn-help"
+        onClick={p.onShowShortcuts}
+        aria-label="Show shortcuts"
+        title="Shortcuts"
+      >
+        {KEY.help}
       </button>
     </header>
   )

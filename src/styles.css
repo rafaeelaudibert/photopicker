@@ -154,6 +154,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-primary { background: var(--brass); border-color: var(--brass); color: #17150f; font-weight: 600; flex: none; }
 .btn-primary:hover:not(:disabled) { background: #dcb42e; border-color: #dcb42e; }
 
+/* Every shortcut is printed on the control it drives, so the keyboard is
+   learnable without reading anything. The full list lives behind ?. */
+.kbd {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 3px 4px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--faint);
+}
+.btn .kbd { margin-left: 8px; }
+.btn:hover:not(:disabled) .kbd { color: var(--dim); }
+.btn-pick.on .kbd { border-color: rgba(0, 0, 0, 0.22); background: rgba(0, 0, 0, 0.09); color: #5d564a; }
+.filter .kbd { padding: 2px 4px; }
+.filter[aria-pressed='true'] .kbd { color: var(--dim); border-color: #3a352c; }
+
+.btn-help {
+  flex: none;
+  width: 28px;
+  padding: 0;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--mono);
+  color: var(--dim);
+}
+
 /* ---------- split work area ---------- */
 
 .work { flex: 1; display: flex; min-height: 0; }
@@ -324,6 +355,48 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .app.fullscreen .divider,
 .app.fullscreen .grid { display: none; }
 .app.fullscreen .preview-stage { padding: 0; }
+
+/* ---------- shortcuts sheet ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: rgba(8, 7, 6, 0.74);
+}
+
+.sheet {
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--edge);
+}
+.sheet-head .info-edit { display: flex; align-items: center; gap: 7px; }
+
+.sheet-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 18px; }
+.sheet-list { margin: 12px 0 0; }
+.sheet-row { display: flex; align-items: baseline; gap: 12px; padding: 5px 0; }
+.sheet-row dd { margin: 0; font-size: 12.5px; color: var(--dim); }
+.sheet-keys { display: flex; gap: 4px; flex: none; width: 80px; }
+.sheet-action { flex: none; width: 142px; font-size: 12px; color: var(--bone); }
+
+@media (max-width: 720px) {
+  .sheet-cols { grid-template-columns: 1fr; }
+}
 
 /* ---------- intro, toast ---------- */
 

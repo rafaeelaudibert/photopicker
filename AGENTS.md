@@ -40,6 +40,11 @@ Change these only with a measurement in hand.
   EXIF rotation tag appear sideways in the grid while looking correct in the preview.
 - **Thumbnails use `object-fit: cover`, the preview uses `contain`.** The grid is for
   scanning and wants uniform tiles; the preview must show the true uncropped frame.
+- **Shortcuts are declared once, in `shortcut-list.ts`.** Controls label themselves from
+  `KEY`, and the `?` sheet lists the same values, so a rebound key cannot leave a stale
+  hint printed on a button. Add a shortcut there first, then handle it in `App.tsx`.
+  Note `shortcut-list.ts` and `Shortcuts.tsx` cannot be named the same: a case-insensitive
+  filesystem makes `./shortcuts` ambiguous and the build fails.
 
 ## Privacy constraint
 
