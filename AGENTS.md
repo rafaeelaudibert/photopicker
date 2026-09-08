@@ -12,6 +12,12 @@ bun run dev      # dev server on :5173
 bun run build    # tsc -b && vite build, must pass before committing
 ```
 
+## Workflow
+
+Commit and push straight to `main`. No pull requests, no feature branches. Keep each
+commit a coherent change with a message that explains why, and make sure `bun run build`
+passes before pushing.
+
 ## Writing style
 
 - **No em dashes anywhere.** Not in code, comments, UI copy, docs or commit messages.
