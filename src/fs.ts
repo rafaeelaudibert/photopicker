@@ -62,19 +62,30 @@ function uniqueName(name: string, taken: Set<string>): string {
   }
 }
 
+/** Five at a time. Copying one file at a time left the disk idle between the
+ *  read and the write of each; the names are assigned up front so they stay in
+ *  list order however the writes interleave. */
+const BATCH = 5
+
 export async function copyToFolder(
   dest: FileSystemDirectoryHandle,
   items: PhotoItem[],
   onProgress: (done: number, total: number) => void,
 ): Promise<void> {
   const taken = new Set<string>()
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    const file = await item.handle.getFile()
-    const target = await dest.getFileHandle(uniqueName(item.name, taken), { create: true })
-    const writable = await target.createWritable()
-    await writable.write(file)
-    await writable.close()
-    onProgress(i + 1, items.length)
+  const targets = items.map((item) => ({ item, name: uniqueName(item.name, taken) }))
+  let done = 0
+
+  for (let i = 0; i < targets.length; i += BATCH) {
+    await Promise.all(
+      targets.slice(i, i + BATCH).map(async ({ item, name }) => {
+        const file = await item.handle.getFile()
+        const target = await dest.getFileHandle(name, { create: true })
+        const writable = await target.createWritable()
+        await writable.write(file)
+        await writable.close()
+        onProgress(++done, targets.length)
+      }),
+    )
   }
 }

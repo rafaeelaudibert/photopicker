@@ -215,6 +215,23 @@ const written = await page.evaluate(() => window.__written)
 check('export writes both files', written.length, 2)
 check('exported files have bytes', written.every((w) => w.size > 0), true)
 
+// More than one copy batch, so the parallel path and its name assignment run.
+await page.locator('.filter').nth(0).click()
+await page.waitForTimeout(300)
+await page.evaluate(() => {
+  window.__written = []
+})
+for (let i = 0; i < 12; i++) {
+  await page.keyboard.press('Space')
+  await page.keyboard.press('ArrowRight')
+}
+const expected = Number((await page.locator('.counter').innerText()).split('\n')[0])
+await page.locator('.btn-primary').click()
+await page.waitForTimeout(3000)
+const batch = await page.evaluate(() => window.__written)
+check('a batch larger than five copies every file', batch.length, expected)
+check('exported names are unique', new Set(batch.map((w) => w.name)).size, batch.length)
+
 if (SHOTS) {
   await page.locator('.filter').nth(0).click()
   await page.waitForTimeout(5200) // let the copy toast dismiss itself
