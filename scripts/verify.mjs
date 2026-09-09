@@ -202,6 +202,36 @@ check('fitted stage never scrolls', seen.scrolled, 0)
 for (let step = 0; step < 6; step++) await page.keyboard.press('ArrowLeft')
 await page.waitForTimeout(600)
 
+// The frame must not resize or move when the full size replaces the thumbnail
+// standing in for it. The image box fills the stage and object-fit letterboxes
+// inside it, so the painted photo depends only on its aspect ratio, which the
+// thumbnail shares. Sizing with max-width and max-height instead only shrinks:
+// a thumbnail smaller than the pane would sit at its own natural size in the
+// middle, and the full frame would jump up and across to fill.
+check(
+  'fitted image box fills the stage, so every resolution lands in one place',
+  await page.evaluate(() => {
+    const stage = document.querySelector('.preview-stage')
+    const img = stage.querySelector('img')
+    if (!img) return 'no image'
+    const style = getComputedStyle(stage)
+    const pad = (side) => Number.parseFloat(style[`padding${side}`])
+    const box = stage.getBoundingClientRect()
+    const seen = img.getBoundingClientRect()
+    const off = [
+      seen.left - (box.left + pad('Left')),
+      seen.top - (box.top + pad('Top')),
+      seen.width - (box.width - pad('Left') - pad('Right')),
+      seen.height - (box.height - pad('Top') - pad('Bottom')),
+    ]
+    return off.every((n) => Math.abs(n) < 2) ? true : `off by ${off.map(Math.round)}`
+  }),
+  true,
+)
+
+await page.keyboard.press('Home')
+await page.waitForTimeout(600)
+
 const exif = await page.locator('.info').innerText()
 console.log(`ok   exif strip: ${exif.replace(/\n/g, ' | ').slice(0, 120)}`)
 

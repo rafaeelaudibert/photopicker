@@ -203,18 +203,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
   overflow: hidden;
 }
 .preview-stage img {
-  /* min-*: 0 because a centred grid item keeps its automatic minimum size,
-     which stops max-height from shrinking a tall photo. */
+  /* The box is the whole stage and object-fit letterboxes the photo inside it,
+     so the frame lands in the same place whatever its resolution. Sizing with
+     max-width and max-height instead only ever shrinks: a thumbnail smaller
+     than the pane would sit at its own natural size in the middle, and the
+     full frame would then jump up and across to fill.
+     min-*: 0 because a centred grid item keeps its automatic minimum size,
+     which for a replaced element is the photo's own intrinsic size. */
   min-width: 0;
   min-height: 0;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
   cursor: zoom-in;
 }
 .preview-stage.actual { place-items: start; overflow: auto; }
-.preview-stage.actual img { max-width: none; max-height: none; cursor: zoom-out; }
+.preview-stage.actual img { width: auto; height: auto; cursor: zoom-out; }
 
 /* Says the frame on screen is not the real one yet, so a fast scrub through a
    shoot reads as waiting rather than as blurry photos. */
