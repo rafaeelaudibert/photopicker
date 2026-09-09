@@ -38,14 +38,40 @@ Change these only with a measurement in hand.
   resolved column width and sets `--row`, which `grid-auto-rows` consumes. If you change
   the grid CSS, verify `getComputedStyle(grid).gridTemplateRows` is not `2px`.
 - **Do not add `content-visibility: auto` to `.cell`.** It was tried. Combined with
-  `aspect-ratio` it mis-sizes rows on scroll re-entry. Plain DOM is fine: 2000 cells scan
-  in ~300ms and scroll at 60fps.
-- **Thumbnails decode last-in-first-out** (`thumbs.ts`). The queue is a stack so the tiles
-  you just scrolled to jump ahead of a backlog. Do not switch it to FIFO.
-- **`createImageBitmap` needs `imageOrientation: 'from-image'`**, otherwise photos with an
-  EXIF rotation tag appear sideways in the grid while looking correct in the preview.
+  `aspect-ratio` it mis-sizes rows on scroll re-entry.
+- **The grid renders a window of rows, and needs two elements to do it.** Rows outside the
+  window become `padding-top` and `padding-bottom` on `.grid`, which keeps cells as direct
+  children so auto-placement and `--row` keep working. `.grid-pane` is the thing that
+  scrolls. They cannot be one element: padding larger than the element's height inflates
+  its own border box rather than its scrollable content, so the scroller grows to fit the
+  window, which grows the window. `GRID_GAP` and `GRID_PAD` in `App.tsx` must match `.grid`.
+- **The window is derived from a height held in state**, refreshed by the `ResizeObserver`,
+  not read live inside the scroll handler. Reading `clientHeight` live meant one
+  measurement taken before the flex layout settled stuck for the whole session.
+- **Thumbnails decode last-in-first-out** (`thumbs.ts`). The queues are stacks so the tiles
+  you just scrolled to jump ahead of a backlog. Do not switch either to FIFO.
+- **Thumbnailing is two passes, and the quick one must outrank the full one.** The quick
+  pass pulls the camera's own thumbnail out of EXIF IFD1 and decodes in about a
+  millisecond; the full pass is a real 800px render and costs a hundred times that. If
+  full ever gets served first the grid goes back to filling one tile at a time.
+- **The IFD1 thumbnail is stored unrotated and carries no EXIF of its own**, so
+  `thumb.worker.ts` applies IFD0's orientation tag by hand. The full pass uses
+  `createImageBitmap` with `imageOrientation: 'from-image'` instead, which does it for you.
+  Both paths have to agree, otherwise a tile flips as it sharpens. Check all eight
+  orientation values if you touch either.
+- **`frames.ts` holds five decoded frames and no more.** Each one retains a full
+  resolution bitmap, which is tens of megabytes on a 24MP file. Five is the photo on
+  screen plus two either side, which is what the cursor needs. Raising it trades memory
+  for nothing.
+- **A frame is decoded before it is displayed**, in `frames.ts` and in `Cell.tsx`. Pointing
+  an `<img>` at a `src` that has not decoded paints one empty frame, which is exactly the
+  blink both caches exist to remove. Do not "simplify" the `image.decode()` calls away.
 - **Thumbnails use `object-fit: cover`, the preview uses `contain`.** The grid is for
   scanning and wants uniform tiles; the preview must show the true uncropped frame.
+- **The preview stage only scrolls in actual size mode.** Fitting the frame to the pane
+  must never produce a scrollbar. The image needs `min-width: 0; min-height: 0` for that:
+  a centred grid item keeps its automatic minimum size, which stops `max-height` from
+  shrinking a tall photo.
 - **Shortcuts are declared once, in `shortcut-list.ts`.** Controls label themselves from
   `KEY`, and the `?` sheet lists the same values, so a rebound key cannot leave a stale
   hint printed on a button. Add a shortcut there first, then handle it in `App.tsx`.
@@ -70,9 +96,11 @@ bun run dev                  # in another shell
 node scripts/verify.mjs      # geometry, picking, EXIF, filters, export
 ```
 
-It asserts tile geometry (the bug above), that all three picking gestures work, that EXIF
-parses, that filters narrow the list, and that export writes the right bytes. Point it at
-a folder of JPEGs with `PHOTOS=/path/to/folder`.
+It asserts tile geometry (the bug above), that the grid really is a window and still
+scrolls the full length of the list, that all three picking gestures work, that picks
+reach `localStorage`, that EXIF parses, that navigating never blanks the stage or shifts
+the EXIF rows, that the fitted stage never scrolls, that filters narrow the list, and that
+export writes the right bytes. Point it at a folder of JPEGs with `PHOTOS=/path/to/folder`.
 
 Generating test photos without a camera:
 
@@ -80,21 +108,27 @@ Generating test photos without a camera:
 magick -size 1600x1200 plasma:fractal -blur 0x4 -quality 88 out.jpg
 ```
 
+Those carry no EXIF thumbnail, so they do not exercise the quick pass. To check that path
+you need files with an IFD1 thumbnail, which means either real camera JPEGs or splicing an
+APP1 segment in by hand. Vary the orientation tag across the set: the quick and full
+passes disagreeing on which way is up is the failure mode worth catching.
+
 ## Layout
 
 ```
 src/
-  App.tsx        state, keyboard, layout, divider drag
+  App.tsx        state, keyboard, row window, divider drag
   TopBar.tsx     folder, filters, size, quota counter, export
   Preview.tsx    large frame, pick button, EXIF strip, field chooser
-  Cell.tsx       one memoised tile, lazily thumbnailed
+  Cell.tsx       one memoised tile in the window
   fs.ts          directory scan, permissions, copy out
-  thumbs.ts      worker pool, LIFO queue, LRU blob cache
+  thumbs.ts      worker pool, quick and full LIFO lanes, LRU blob cache
   thumb.worker.ts
-  exif.ts        JPEG APP1 / TIFF IFD parser
+  frames.ts      five decoded full frames around the cursor
+  exif.ts        JPEG APP1 / TIFF IFD parser, including the IFD1 thumbnail
   idb.ts         folder handle persistence
-  useInView.ts   shared IntersectionObserver
 ```
 
 State that outlives a session: picks, target, tile size, pane width and EXIF field choice
-in `localStorage`; the folder handle in IndexedDB.
+in `localStorage`; the folder handle in IndexedDB. The `localStorage` writes go through
+`persist()` in `App.tsx`, which defers them to an idle callback and flushes on `pagehide`.

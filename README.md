@@ -91,9 +91,16 @@ preview.
 
 ## How it works
 
-- `src/fs.ts` walks the directory handle, and copies picked files with `createWritable`.
+- `src/fs.ts` walks the directory handle, and copies picked files with `createWritable`,
+  five at a time.
 - `src/thumbs.ts` runs a pool of web workers that decode and downscale thumbnails off the
   main thread. Requests are served last-in-first-out so whatever you just scrolled to is
-  decoded first, and tiles load lazily through a shared `IntersectionObserver`.
+  decoded first. Each photo is thumbnailed twice: the camera's own thumbnail out of the
+  EXIF, which decodes in about a millisecond and covers the grid almost immediately, then
+  the real 800px render behind it.
+- `src/frames.ts` keeps five decoded full resolution frames, the photo you are looking at
+  and two either side, so stepping through a shoot does not wait on a decode.
+- The grid renders only the rows on screen. A 2000 photo folder puts a few dozen tiles in
+  the DOM rather than 2000.
 - `src/idb.ts` keeps the folder handle in IndexedDB so a cull can span several sessions.
-- Picks live in `localStorage`, keyed by folder name.
+- Picks live in `localStorage`, keyed by folder name, written on an idle callback.
