@@ -1,7 +1,10 @@
 import type { PhotoItem } from './types'
 
-const THUMB_SIZE = 400
-const MAX_CACHED = 2600
+/** Covers the largest tile the size slider reaches, 400px, on a 2x display. */
+const THUMB_SIZE = 800
+/** Roughly 150MB of blobs at this size. Far more than a screen, so scrolling
+ *  back through a shoot stays instant. */
+const MAX_CACHED = 1400
 const POOL_SIZE = Math.min(6, Math.max(2, (navigator.hardwareConcurrency ?? 4) - 2))
 /** How many files may be open ahead of the pool. Reading a file is disk IO, so
  *  it happens before a worker is claimed and a worker never waits on it. */

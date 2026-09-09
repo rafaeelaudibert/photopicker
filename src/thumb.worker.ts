@@ -43,15 +43,12 @@ async function full(file: File, size: number): Promise<Blob> {
   const bitmap = await createImageBitmap(file, {
     imageOrientation: 'from-image',
     resizeWidth: size,
-    // The grid is for scanning, not for judging sharpness, and the preview
-    // alongside is the full frame. `medium` is much cheaper than `high` at this
-    // scale factor and reads the same on a tile.
-    resizeQuality: 'medium',
+    resizeQuality: 'high',
   })
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
   bitmap.close()
-  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 })
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
 }
 
 self.onmessage = async (e: MessageEvent<Req>) => {
