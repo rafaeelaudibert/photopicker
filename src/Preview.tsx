@@ -34,6 +34,7 @@ export function Preview(p: Props) {
     data: {},
   })
   const [rows, setRows] = useState<FieldId[]>([])
+  const [failed, setFailed] = useState(false)
   const [actualSize, setActualSize] = useState(false)
   const [editingFields, setEditingFields] = useState(false)
 
@@ -45,6 +46,7 @@ export function Preview(p: Props) {
     }
     let stale = false
     setActualSize(false)
+    setFailed(false)
 
     const ready = peekFrame(item.key)
     if (ready) {
@@ -64,7 +66,7 @@ export function Preview(p: Props) {
           setSrc(next.url)
           setFrame(next)
           readExif(next.file).then((data) => !stale && setExif({ key: item.key, data }))
-        }, () => {})
+        }, () => !stale && setFailed(true))
       },
       ready ? 0 : SETTLE_MS,
     )
@@ -124,7 +126,11 @@ export function Preview(p: Props) {
         title={actualSize ? 'Click to fit' : 'Click for actual size'}
       >
         {src && <img src={src} alt={item.name} draggable={false} />}
-        {!showing && <div className="stage-note">Loading full size</div>}
+        {!showing && (
+          <div className="stage-note">
+            {failed ? 'Could not read this file' : 'Loading full size'}
+          </div>
+        )}
       </div>
 
       <footer className="preview-bar">

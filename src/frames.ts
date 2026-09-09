@@ -33,10 +33,16 @@ async function load(item: PhotoItem): Promise<Ready> {
   const url = URL.createObjectURL(file)
   const image = new Image()
   image.src = url
-  // Decoding here rather than letting the <img> do it is the whole point: a
-  // frame is ready to paint the instant it is handed over, so the stage never
-  // goes blank between one photo and the next.
-  await image.decode()
+  try {
+    // Decoding here rather than letting the <img> do it is the whole point: a
+    // frame is ready to paint the instant it is handed over, so the stage never
+    // goes blank between one photo and the next.
+    await image.decode()
+  } catch (err) {
+    // Nothing downstream can revoke a url attached to a promise that rejected.
+    URL.revokeObjectURL(url)
+    throw err
+  }
   return {
     url,
     image,

@@ -30,6 +30,12 @@ const GRID_PAD = 10
 const OVERSCAN = 3
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+/** Only windowed cells are in the DOM, so a tile carries its own index. */
+const indexOfCell = (target: EventTarget) => {
+  const el = (target as Element).closest?.('.cell') as HTMLElement | null
+  return el?.dataset.index ? Number(el.dataset.index) : -1
+}
 const readNumber = (key: string, fallback: number) => Number(localStorage.getItem(key)) || fallback
 
 /** Writing to localStorage is synchronous and lands on whatever the browser is
@@ -171,12 +177,6 @@ export default function App() {
       return next
     })
   }, [])
-
-  /** Only windowed cells are in the DOM, so a tile carries its own index. */
-  const indexOfCell = (target: EventTarget) => {
-    const el = (target as Element).closest?.('.cell') as HTMLElement | null
-    return el?.dataset.index ? Number(el.dataset.index) : -1
-  }
 
   /** Square tiles need an explicit row height, measured from the resolved
    *  column. Reading it here rather than per keystroke keeps getComputedStyle,

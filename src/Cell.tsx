@@ -49,9 +49,11 @@ function CellImpl({ item, index, picked, selected }: Props) {
       aria-label={`${item.name}, ${picked ? 'picked' : 'not picked'}`}
     >
       {url && <img src={url} alt="" draggable={false} />}
-      <button type="button" className="cell-pick" tabIndex={-1} aria-hidden="true">
+      {/* A span, not a button: the cell itself is the control, and a focusable
+          element inside another one is invalid. Clicks are delegated anyway. */}
+      <span className="cell-pick" aria-hidden="true">
         {picked ? '✓' : '+'}
-      </button>
+      </span>
       <span className="cell-name">{item.name}</span>
     </div>
   )
