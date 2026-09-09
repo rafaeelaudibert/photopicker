@@ -15,11 +15,29 @@ function CellImpl({ item, picked, selected }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref)
   const [url, setUrl] = useState<string | undefined>(() => getCached(item.key))
+  const painted = useRef(url)
 
   useEffect(() => {
-    if (!inView || url) return
-    return requestThumb(item, setUrl)
-  }, [inView, url, item])
+    if (!inView) return
+    let stale = false
+    const stop = requestThumb(item, (next) => {
+      if (stale || next === painted.current) return
+      const probe = new Image()
+      probe.src = next
+      // Pointing an <img> at a src that has not decoded paints one empty frame.
+      // Decode first, then swap, so a tile never blinks on the way to sharp.
+      const show = () => {
+        if (stale) return
+        painted.current = next
+        setUrl(next)
+      }
+      probe.decode().then(show, show)
+    })
+    return () => {
+      stale = true
+      stop()
+    }
+  }, [inView, item])
 
   return (
     <div
@@ -30,7 +48,7 @@ function CellImpl({ item, picked, selected }: Props) {
       aria-pressed={picked}
       aria-label={`${item.name}, ${picked ? 'picked' : 'not picked'}`}
     >
-      {url && <img src={url} alt="" className="loaded" draggable={false} />}
+      {url && <img src={url} alt="" draggable={false} />}
       <button type="button" className="cell-pick" tabIndex={-1} aria-hidden="true">
         {picked ? '✓' : '+'}
       </button>

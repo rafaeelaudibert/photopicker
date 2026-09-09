@@ -13,6 +13,8 @@ const TAG = {
   exposureBias: 0x9204,
   focalLength: 0x920a,
   lensModel: 0xa434,
+  thumbOffset: 0x0201,
+  thumbLength: 0x0202,
 } as const
 
 export const FIELDS = [
@@ -34,11 +36,14 @@ export const DEFAULT_FIELDS: FieldId[] = ['camera', 'lens', 'date', 'shutter', '
 
 type Raw = Map<number, number | number[] | string>
 
-function readIfd(view: DataView, tiff: number, ifd: number, le: boolean, out: Raw) {
+/** Fills `out` with this IFD's tags and returns the offset of the next IFD,
+ *  relative to the TIFF header, or 0 when this is the last one. */
+function readIfd(view: DataView, tiff: number, ifd: number, le: boolean, out: Raw): number {
+  if (ifd + 2 > view.byteLength) return 0
   const count = view.getUint16(ifd, le)
   for (let i = 0; i < count; i++) {
     const entry = ifd + 2 + i * 12
-    if (entry + 12 > view.byteLength) return
+    if (entry + 12 > view.byteLength) return 0
     const tag = view.getUint16(entry, le)
     const type = view.getUint16(entry + 2, le)
     const num = view.getUint32(entry + 4, le)
@@ -66,13 +71,20 @@ function readIfd(view: DataView, tiff: number, ifd: number, le: boolean, out: Ra
       out.set(tag, [view.getInt32(at, le), view.getInt32(at + 4, le)])
     }
   }
+  const after = ifd + 2 + count * 12
+  return after + 4 <= view.byteLength ? view.getUint32(after, le) : 0
 }
 
-/** Locates the APP1 Exif segment and walks IFD0 plus the Exif sub-IFD. */
-function parse(buffer: ArrayBuffer): Raw {
-  const view = new DataView(buffer)
-  const raw: Raw = new Map()
-  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return raw
+interface Tiff {
+  view: DataView
+  /** Byte offset of the TIFF header. Every IFD offset is relative to it. */
+  tiff: number
+  le: boolean
+}
+
+/** Locates the APP1 Exif segment and the TIFF header inside it. */
+function locateTiff(view: DataView): Tiff | null {
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return null
 
   let p = 2
   while (p + 4 <= view.byteLength) {
@@ -83,15 +95,61 @@ function parse(buffer: ArrayBuffer): Raw {
     if (marker === 0xffe1 && view.getUint32(p + 4) === 0x45786966) {
       const tiff = p + 10
       if (tiff + 8 > view.byteLength) break
-      const le = view.getUint16(tiff) === 0x4949
-      readIfd(view, tiff, tiff + view.getUint32(tiff + 4, le), le, raw)
-      const sub = raw.get(TAG.exifIfd)
-      if (typeof sub === 'number') readIfd(view, tiff, tiff + sub, le, raw)
-      break
+      return { view, tiff, le: view.getUint16(tiff) === 0x4949 }
     }
     p += 2 + length
   }
+  return null
+}
+
+const firstIfd = ({ view, tiff, le }: Tiff) => tiff + view.getUint32(tiff + 4, le)
+
+/** Walks IFD0 plus the Exif sub-IFD. */
+function parse(buffer: ArrayBuffer): Raw {
+  const raw: Raw = new Map()
+  const head = locateTiff(new DataView(buffer))
+  if (!head) return raw
+  const { view, tiff, le } = head
+
+  readIfd(view, tiff, firstIfd(head), le, raw)
+  const sub = raw.get(TAG.exifIfd)
+  if (typeof sub === 'number') readIfd(view, tiff, tiff + sub, le, raw)
   return raw
+}
+
+export interface EmbeddedThumbnail {
+  /** JPEG bytes exactly as the camera wrote them. */
+  bytes: Uint8Array<ArrayBuffer>
+  /** From IFD0. The thumbnail carries no Exif of its own, so it is stored
+   *  unrotated and this tag is the only thing that says which way is up. */
+  orientation: number
+}
+
+/** Pulls the camera's own thumbnail out of IFD1. It is usually 160x120 and
+ *  already encoded, so it decodes in about a millisecond against a hundred or
+ *  more for the full frame. Returns null for files that do not carry one. */
+export function embeddedThumbnail(buffer: ArrayBuffer): EmbeddedThumbnail | null {
+  const head = locateTiff(new DataView(buffer))
+  if (!head) return null
+  const { view, tiff, le } = head
+
+  const ifd0: Raw = new Map()
+  const next = readIfd(view, tiff, firstIfd(head), le, ifd0)
+  if (!next) return null
+
+  const ifd1: Raw = new Map()
+  readIfd(view, tiff, tiff + next, le, ifd1)
+  const at = ifd1.get(TAG.thumbOffset)
+  const length = ifd1.get(TAG.thumbLength)
+  if (typeof at !== 'number' || typeof length !== 'number' || length < 4) return null
+
+  const start = tiff + at
+  if (start + length > view.byteLength) return null
+  const bytes = new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset + start, length)
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null
+
+  const orientation = ifd0.get(TAG.orientation)
+  return { bytes, orientation: typeof orientation === 'number' ? orientation : 1 }
 }
 
 const ratio = (v: unknown) => (Array.isArray(v) && v[1] ? v[0] / v[1] : undefined)

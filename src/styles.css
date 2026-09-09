@@ -290,10 +290,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
      The preview pane alongside shows the true, uncropped frame. */
   object-fit: cover;
   display: block;
-  opacity: 0;
-  transition: opacity 200ms ease-out;
 }
-.cell img.loaded { opacity: 1; }
 
 .cell.selected { border-color: var(--brass); }
 .cell.picked { border-color: var(--bone); }
