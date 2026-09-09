@@ -21,6 +21,12 @@ const SIZE_KEY = 'photopicker:cellsize'
 const WIDTH_KEY = 'photopicker:gridwidth'
 const FIELDS_KEY = 'photopicker:fields'
 
+/** Must match .grid in styles.css: the row window is arithmetic, not measurement. */
+const GRID_GAP = 8
+const GRID_PAD = 10
+/** Rows kept rendered above and below the viewport, so a flick lands on tiles. */
+const OVERSCAN = 3
+
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const readNumber = (key: string, fallback: number) => Number(localStorage.getItem(key)) || fallback
 
@@ -44,7 +50,7 @@ export default function App() {
   const [fields, setFields] = useState<FieldId[]>(readFields)
   const [filter, setFilter] = useState<Filter>('all')
   const [cursor, setCursor] = useState(0)
-  const [rowHeight, setRowHeight] = useState(0)
+  const [layout, setLayout] = useState({ cols: 1, row: 0, height: 0, first: 0, last: 0 })
   const [showInfo, setShowInfo] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -53,6 +59,7 @@ export default function App() {
   const [toast, setToast] = useState<{ label: string; text: string } | null>(null)
   const [resumable, setResumable] = useState<FileSystemDirectoryHandle | null>(null)
 
+  const paneRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const supported = supportsFileSystemAccess()
 
@@ -120,38 +127,85 @@ export default function App() {
     })
   }, [])
 
+  /** Only windowed cells are in the DOM, so a tile carries its own index. */
   const indexOfCell = (target: EventTarget) => {
-    const el = (target as Element).closest?.('.cell')
-    const children = gridRef.current?.children
-    return el && children ? Array.prototype.indexOf.call(children, el) : -1
+    const el = (target as Element).closest?.('.cell') as HTMLElement | null
+    return el?.dataset.index ? Number(el.dataset.index) : -1
   }
 
-  const columnCount = () => {
-    const grid = gridRef.current
-    if (!grid) return 1
-    return getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 1
-  }
-
-  /** Square tiles need an explicit row height, measured from the resolved column. */
+  /** Square tiles need an explicit row height, measured from the resolved
+   *  column. Reading it here rather than per keystroke keeps getComputedStyle,
+   *  which forces layout, off the arrow keys and the scroll handler. */
   useEffect(() => {
+    const pane = paneRef.current
     const grid = gridRef.current
-    if (!grid) return
+    if (!pane || !grid) return
     const measure = () => {
-      const first = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean)[0]
-      const width = Number.parseFloat(first)
-      if (width > 0) setRowHeight(Math.round(width))
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean)
+      const row = Math.round(Number.parseFloat(columns[0]))
+      const cols = columns.length || 1
+      const height = pane.clientHeight
+      if (!(row > 0)) return
+      setLayout((prev) =>
+        prev.row === row && prev.cols === cols && prev.height === height
+          ? prev
+          : { ...prev, row, cols, height },
+      )
     }
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(grid)
+    observer.observe(pane)
     return () => observer.disconnect()
   }, [cellSize, items.length])
 
-  /** Keeps the selected thumbnail visible as the cursor moves. */
+  const rowCount = Math.ceil(view.length / layout.cols)
+
+  /** Picks the band of rows worth rendering. Bails when the band has not moved,
+   *  so scrolling within a row costs nothing. */
+  const windowRows = useCallback(() => {
+    const pane = paneRef.current
+    if (!pane || !layout.row || !layout.height) return
+    const step = layout.row + GRID_GAP
+    const top = pane.scrollTop - GRID_PAD
+    const first = Math.max(0, Math.floor(top / step) - OVERSCAN)
+    const last = Math.max(
+      first,
+      Math.min(rowCount - 1, Math.floor((top + layout.height) / step) + OVERSCAN),
+    )
+    setLayout((prev) => (prev.first === first && prev.last === last ? prev : { ...prev, first, last }))
+  }, [layout.row, layout.height, rowCount])
+
   useEffect(() => {
-    const el = gridRef.current?.children[cursor] as HTMLElement | undefined
-    el?.scrollIntoView({ block: 'nearest' })
-  }, [cursor, view])
+    windowRows()
+    const pane = paneRef.current
+    if (!pane) return
+    let frame = 0
+    const onScroll = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        windowRows()
+      })
+    }
+    pane.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      pane.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(frame)
+    }
+  }, [windowRows])
+
+  /** Keeps the selected thumbnail visible as the cursor moves. Computed from the
+   *  row geometry rather than scrollIntoView, which forces a synchronous layout
+   *  and would fire on every pick while a filter is on. */
+  useEffect(() => {
+    const pane = paneRef.current
+    if (!pane || !layout.row) return
+    const step = layout.row + GRID_GAP
+    const top = GRID_PAD + Math.floor(cursor / layout.cols) * step
+    if (top - GRID_PAD < pane.scrollTop) pane.scrollTop = top - GRID_PAD
+    else if (top + layout.row + GRID_PAD > pane.scrollTop + layout.height)
+      pane.scrollTop = top + layout.row + GRID_PAD - layout.height
+  }, [cursor, view, layout.row, layout.cols, layout.height])
 
   useEffect(() => {
     if (!items.length) return
@@ -180,9 +234,9 @@ export default function App() {
         case 'ArrowLeft':
           return move(-1)
         case 'ArrowDown':
-          return move(fullscreen ? 1 : columnCount())
+          return move(fullscreen ? 1 : layout.cols)
         case 'ArrowUp':
-          return move(fullscreen ? -1 : -columnCount())
+          return move(fullscreen ? -1 : -layout.cols)
         case 'Home':
           return move(-Infinity)
         case 'End':
@@ -214,7 +268,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, cursor, fullscreen, showShortcuts, items.length, toggle])
+  }, [view, cursor, fullscreen, showShortcuts, items.length, toggle, layout.cols])
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -301,6 +355,14 @@ export default function App() {
 
   const current = view[cursor]
 
+  // Rows outside the window become padding rather than elements. Cells stay
+  // direct children of the grid, so auto-placement and the measured row height
+  // keep working exactly as they did with the whole list in the DOM.
+  const first = Math.min(layout.first, Math.max(0, rowCount - 1))
+  const last = Math.min(layout.last, rowCount - 1)
+  const step = layout.row + GRID_GAP
+  const windowed = view.slice(first * layout.cols, (last + 1) * layout.cols)
+
   return (
     <div className={`app${fullscreen ? ' fullscreen' : ''}`}>
       <TopBar
@@ -346,15 +408,9 @@ export default function App() {
         />
 
         <div
-          className="grid"
-          ref={gridRef}
-          style={
-            {
-              '--cell': `${cellSize}px`,
-              ...(rowHeight ? { '--row': `${rowHeight}px` } : {}),
-              width: gridWidth,
-            } as CSSProperties
-          }
+          className="grid-pane"
+          ref={paneRef}
+          style={{ width: gridWidth }}
           onClick={(e) => {
             const i = indexOfCell(e.target)
             if (i < 0) return
@@ -366,14 +422,31 @@ export default function App() {
             if (i >= 0 && !(e.target as Element).closest('.cell-pick')) toggle(view[i].key)
           }}
         >
-          {view.map((item, i) => (
-            <Cell
-              key={item.key}
-              item={item}
-              picked={picked.has(item.key)}
-              selected={i === cursor}
-            />
-          ))}
+          <div
+            className="grid"
+            ref={gridRef}
+            style={
+              {
+                '--cell': `${cellSize}px`,
+                ...(layout.row ? { '--row': `${layout.row}px` } : {}),
+                paddingTop: GRID_PAD + first * step,
+                paddingBottom: GRID_PAD + Math.max(0, rowCount - 1 - last) * step,
+              } as CSSProperties
+            }
+          >
+            {windowed.map((item, i) => {
+              const index = first * layout.cols + i
+              return (
+                <Cell
+                  key={item.key}
+                  item={item}
+                  index={index}
+                  picked={picked.has(item.key)}
+                  selected={index === cursor}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
 

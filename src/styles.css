@@ -255,9 +255,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- thumbnail grid ---------- */
 
-.grid {
+/* The pane scrolls, the grid inside it is as tall as the whole list. They have
+   to be two elements: App.tsx turns the rows outside the window into padding on
+   the grid, and padding that large on the scroll container itself would inflate
+   the container's own box rather than its scrollable content. */
+.grid-pane {
   flex: none;
+  min-height: 0;
   overflow-y: auto;
+  background: var(--sheet);
+}
+
+.grid {
   padding: 10px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--cell), 1fr));
@@ -265,9 +274,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
      cells. Chrome does not feed aspect-ratio into auto row sizing here, which
      collapses every row to the border height and stacks the tiles. */
   grid-auto-rows: var(--row, var(--cell));
+  /* Kept in step with GRID_GAP and GRID_PAD in App.tsx, which turns the rows
+     outside the window into padding. Changing either here needs both. */
   gap: 8px;
   align-content: start;
-  background: var(--sheet);
 }
 
 .cell {
@@ -350,7 +360,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- fullscreen ---------- */
 
 .app.fullscreen .divider,
-.app.fullscreen .grid { display: none; }
+.app.fullscreen .grid-pane { display: none; }
 .app.fullscreen .preview-stage { padding: 0; }
 
 /* ---------- shortcuts sheet ---------- */

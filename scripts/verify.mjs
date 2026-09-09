@@ -96,7 +96,25 @@ await page.getByRole('button', { name: /Open folder|Resume/ }).first().click()
 await page.waitForSelector('.cell img', { timeout: 60000 })
 await page.waitForTimeout(2500)
 
-check('photos found', await page.locator('.cell').count(), total)
+check('photos found', (await page.locator('.filter-count').first().innerText()).trim(), total)
+
+// Only the rows on screen are in the DOM. The rest are padding, so the grid
+// must still scroll as if every tile were there.
+const windowed = await page.evaluate(() => {
+  const style = getComputedStyle(document.querySelector('.grid'))
+  return {
+    cells: document.querySelectorAll('.cell').length,
+    cols: style.gridTemplateColumns.split(' ').filter(Boolean).length,
+    row: Number.parseFloat(style.gridTemplateRows.split(' ')[0]),
+    height: document.querySelector('.grid-pane').scrollHeight,
+  }
+})
+check('grid renders a window, not the whole list', windowed.cells < total, true)
+check(
+  'scroll height covers every row',
+  Math.abs(windowed.height - (Math.ceil(total / windowed.cols) * (windowed.row + 8) - 8 + 20)) < 3,
+  true,
+)
 
 // Tiles must be square and must not overlap. Regression guard for the grid row bug.
 const grid = await page.evaluate(() => {
@@ -114,6 +132,26 @@ const grid = await page.evaluate(() => {
 check('tiles square', grid.square, true)
 check('tiles overlap', grid.overlap, false)
 check('row height matches tile', grid.firstRow > 20, true)
+
+// Scrolling to the end must land on real tiles, not on the spacer padding.
+await page.evaluate(() => {
+  const pane = document.querySelector('.grid-pane')
+  pane.scrollTop = pane.scrollHeight
+})
+await page.waitForTimeout(600)
+const atEnd = await page.evaluate(() => {
+  const grid = document.querySelector('.grid-pane').getBoundingClientRect()
+  const cells = [...document.querySelectorAll('.cell')]
+  const last = cells[cells.length - 1].getBoundingClientRect()
+  return { last: Number(cells[cells.length - 1].dataset.index), gap: Math.round(grid.bottom - last.bottom) }
+})
+check('scrolling to the end reaches the last photo', atEnd.last, total - 1)
+// Only the grid's own 10px bottom padding should sit below the last row.
+check('no spacer left under the last row', atEnd.gap <= 11, true)
+await page.evaluate(() => {
+  document.querySelector('.grid-pane').scrollTop = 0
+})
+await page.waitForTimeout(400)
 
 await page.locator('.cell').nth(3).click()
 await page.keyboard.press('Space')

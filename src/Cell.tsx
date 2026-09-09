@@ -1,24 +1,24 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { getCached, requestThumb } from './thumbs'
-import { useInView } from './useInView'
 import type { PhotoItem } from './types'
 
 interface Props {
   item: PhotoItem
+  /** Position in the filtered list, not in the window. The grid reads it back
+   *  off the DOM to turn a click into a cursor position. */
+  index: number
   picked: boolean
   selected: boolean
 }
 
-/** Props stay stable so the grid can memoise thousands of these. Clicks and
- *  focus are delegated to the grid container. */
-function CellImpl({ item, picked, selected }: Props) {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref)
+/** Props stay stable so the grid can memoise the window. Clicks and focus are
+ *  delegated to the grid container. Being mounted means being on screen, so a
+ *  cell asks for its thumbnail as soon as it exists. */
+function CellImpl({ item, index, picked, selected }: Props) {
   const [url, setUrl] = useState<string | undefined>(() => getCached(item.key))
   const painted = useRef(url)
 
   useEffect(() => {
-    if (!inView) return
     let stale = false
     const stop = requestThumb(item, (next) => {
       if (stale || next === painted.current) return
@@ -37,11 +37,11 @@ function CellImpl({ item, picked, selected }: Props) {
       stale = true
       stop()
     }
-  }, [inView, item])
+  }, [item])
 
   return (
     <div
-      ref={ref}
+      data-index={index}
       role="button"
       tabIndex={-1}
       className={`cell${picked ? ' picked' : ''}${selected ? ' selected' : ''}`}
