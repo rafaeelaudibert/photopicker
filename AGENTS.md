@@ -12,6 +12,9 @@ bun run dev      # dev server on :5173
 bun run build    # tsc -b && vite build, must pass before committing
 ```
 
+Pushing to `main` builds and publishes `dist` to GitHub Pages
+(`.github/workflows/deploy.yml`).
+
 ## Workflow
 
 Commit and push straight to `main`. No pull requests, no feature branches. Keep each
@@ -72,6 +75,11 @@ Change these only with a measurement in hand.
   must never produce a scrollbar. The image needs `min-width: 0; min-height: 0` for that:
   a centred grid item keeps its automatic minimum size, which stops `max-height` from
   shrinking a tall photo.
+- **Vite's `base` is `'./'`, not `'/'`.** The Pages deploy serves the app from
+  `/photopicker/`, and an absolute base would make every asset 404 there. Relative keeps
+  one bundle working on the dev server, on Pages and from a local `dist`. The worker is
+  unaffected either way: `new URL('./thumb.worker.ts', import.meta.url)` resolves against
+  the chunk's own URL at runtime.
 - **Shortcuts are declared once, in `shortcut-list.ts`.** Controls label themselves from
   `KEY`, and the `?` sheet lists the same values, so a rebound key cannot leave a stale
   hint printed on a button. Add a shortcut there first, then handle it in `App.tsx`.

@@ -22,7 +22,13 @@ a quota. This one is built around it.
 
 ## Getting started
 
-Requires [bun](https://bun.sh) and Google Chrome.
+The quickest way in is the hosted build:
+[rafaeelaudibert.github.io/photopicker](https://rafaeelaudibert.github.io/photopicker/).
+It is the same static bundle, served over HTTPS because the File System Access API needs a
+secure context. Loading the page is the only network request the app ever makes: your
+photos are read from your own disk and never leave it.
+
+To run it yourself you need [bun](https://bun.sh) and Google Chrome.
 
 ```sh
 bun install
@@ -30,6 +36,13 @@ bun run dev
 ```
 
 Then open the printed URL in Chrome and pick your photo folder.
+
+## Deploying
+
+`.github/workflows/deploy.yml` builds on every push to `main` and publishes `dist` to
+GitHub Pages. Pages must be set to deploy from GitHub Actions in the repository settings.
+The Vite `base` is `'./'`, so the bundle is path-agnostic: it works on the dev server, at
+the `/photopicker/` project path and from a `dist` folder opened directly.
 
 ## How you use it
 
