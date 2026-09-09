@@ -32,6 +32,33 @@ const OVERSCAN = 3
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const readNumber = (key: string, fallback: number) => Number(localStorage.getItem(key)) || fallback
 
+/** Writing to localStorage is synchronous and lands on whatever the browser is
+ *  in the middle of, which for picks is a keystroke and for the divider is a
+ *  drag frame. None of it is urgent, so it waits for an idle moment. */
+const pending = new Map<string, { id: number; value: string }>()
+function persist(key: string, value: string) {
+  const queued = pending.get(key)
+  if (queued) cancelIdleCallback(queued.id)
+  const id = requestIdleCallback(
+    () => {
+      pending.delete(key)
+      localStorage.setItem(key, value)
+    },
+    { timeout: 2000 },
+  )
+  pending.set(key, { id, value })
+}
+
+/** A tab can be closed inside the idle window. Losing a session of picks would
+ *  be a poor trade for the milliseconds saved. */
+window.addEventListener('pagehide', () => {
+  for (const [key, { id, value }] of pending) {
+    cancelIdleCallback(id)
+    localStorage.setItem(key, value)
+  }
+  pending.clear()
+})
+
 function readFields(): FieldId[] {
   try {
     const stored = JSON.parse(localStorage.getItem(FIELDS_KEY) ?? 'null')
@@ -69,13 +96,13 @@ export default function App() {
     loadHandle().then((h) => h && setResumable(h)).catch(() => {})
   }, [])
 
-  useEffect(() => localStorage.setItem(TARGET_KEY, String(target)), [target])
-  useEffect(() => localStorage.setItem(SIZE_KEY, String(cellSize)), [cellSize])
-  useEffect(() => localStorage.setItem(WIDTH_KEY, String(gridWidth)), [gridWidth])
-  useEffect(() => localStorage.setItem(FIELDS_KEY, JSON.stringify(fields)), [fields])
+  useEffect(() => persist(TARGET_KEY, String(target)), [target])
+  useEffect(() => persist(SIZE_KEY, String(cellSize)), [cellSize])
+  useEffect(() => persist(WIDTH_KEY, String(gridWidth)), [gridWidth])
+  useEffect(() => persist(FIELDS_KEY, JSON.stringify(fields)), [fields])
 
   useEffect(() => {
-    if (folderName) localStorage.setItem(picksKey(folderName), JSON.stringify([...picked]))
+    if (folderName) persist(picksKey(folderName), JSON.stringify([...picked]))
   }, [picked, folderName])
 
   useEffect(() => {
@@ -290,9 +317,21 @@ export default function App() {
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
-    const onMove = (ev: PointerEvent) =>
-      setGridWidth(clamp(window.innerWidth - ev.clientX, 200, window.innerWidth - 360))
+    let width = gridWidth
+    let frame = 0
+    // Pointer moves arrive faster than frames. Coalescing them means one relayout
+    // of the grid per frame rather than one per event.
+    const onMove = (ev: PointerEvent) => {
+      width = clamp(window.innerWidth - ev.clientX, 200, window.innerWidth - 360)
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        setGridWidth(width)
+      })
+    }
     const stop = () => {
+      cancelAnimationFrame(frame)
+      setGridWidth(width)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', stop)
     }

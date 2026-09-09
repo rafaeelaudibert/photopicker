@@ -158,6 +158,18 @@ await page.keyboard.press('Space')
 await page.locator('.cell').nth(7).dblclick()
 check('picking by keyboard and double-click', (await page.locator('.counter').innerText()).split('\n')[0], '002')
 
+// Picks are written on an idle callback, so they must still reach localStorage.
+await page.waitForTimeout(2200)
+check(
+  'picks reach localStorage',
+  await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('photopicker:picks:'))
+      .flatMap((k) => JSON.parse(localStorage.getItem(k))).length,
+  ),
+  2,
+)
+
 await page.keyboard.press('ArrowRight')
 check('arrow key moves the cursor', (await page.locator('.preview-pos').innerText()).split(' ')[0], '9')
 
