@@ -4,7 +4,7 @@ import { Preview } from './Preview'
 import { Shortcuts } from './Shortcuts'
 import { TopBar } from './TopBar'
 import { DEFAULT_FIELDS, type FieldId } from './exif'
-import { prefetchFrames } from './frames'
+import { clearFrames, prefetchFrames } from './frames'
 import {
   copyToFolder,
   ensureReadPermission,
@@ -14,6 +14,7 @@ import {
   supportsFileSystemAccess,
 } from './fs'
 import { clearHandle, loadHandle, saveHandle } from './idb'
+import { resetThumbs } from './thumbs'
 import type { Filter, PhotoItem } from './types'
 
 const picksKey = (folder: string) => `photopicker:picks:${folder}`
@@ -87,6 +88,10 @@ export default function App() {
     if (!(await ensureReadPermission(handle))) return
     setScanning(0)
     setResumable(null)
+    // Nothing from the last folder is worth keeping, and a path that exists in
+    // both would otherwise show the old folder's photo.
+    resetThumbs()
+    clearFrames()
     try {
       const found = await scanFolder(handle, setScanning)
       const valid = new Set(found.map((f) => f.key))

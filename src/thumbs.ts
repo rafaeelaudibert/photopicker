@@ -122,6 +122,20 @@ function drain() {
   }
 }
 
+/** Drops everything from the previous folder: blobs, queues and pending work.
+ *  Results already inside a worker come back with no job to match and are
+ *  thrown away by the handler above. */
+export function resetThumbs() {
+  for (const entry of cache.values()) URL.revokeObjectURL(entry.url)
+  cache.clear()
+  listeners.clear()
+  active.clear()
+  for (const lanes of [unread, opened]) {
+    lanes.quick.length = 0
+    lanes.full.length = 0
+  }
+}
+
 export function getCached(key: string): string | undefined {
   const entry = cache.get(key)
   if (!entry) return undefined
