@@ -161,6 +161,35 @@ check('picking by keyboard and double-click', (await page.locator('.counter').in
 await page.keyboard.press('ArrowRight')
 check('arrow key moves the cursor', (await page.locator('.preview-pos').innerText()).split(' ')[0], '9')
 
+// The stage must never empty out between one photo and the next, and the EXIF
+// strip must keep its rows so the frame above it does not shift.
+const readStage = () =>
+  page.evaluate(() => {
+    const stage = document.querySelector('.preview-stage')
+    return {
+      painted: !!stage.querySelector('img'),
+      scrolls: stage.scrollHeight > stage.clientHeight + 1 || stage.scrollWidth > stage.clientWidth + 1,
+      rows: [...document.querySelectorAll('.info-row .label')].map((e) => e.textContent).join(','),
+    }
+  })
+const seen = { blank: 0, samples: 0, rows: new Set(), scrolled: 0 }
+for (let step = 0; step < 6; step++) {
+  await page.keyboard.press('ArrowRight')
+  for (let i = 0; i < 12; i++) {
+    const stage = await readStage()
+    seen.samples++
+    if (!stage.painted) seen.blank++
+    if (stage.scrolls) seen.scrolled++
+    seen.rows.add(stage.rows)
+  }
+  await page.waitForTimeout(250)
+}
+check(`stage never blanks while navigating (${seen.samples} samples)`, seen.blank, 0)
+check('exif strip keeps its rows while navigating', seen.rows.size, 1)
+check('fitted stage never scrolls', seen.scrolled, 0)
+for (let step = 0; step < 6; step++) await page.keyboard.press('ArrowLeft')
+await page.waitForTimeout(600)
+
 const exif = await page.locator('.info').innerText()
 console.log(`ok   exif strip: ${exif.replace(/\n/g, ' | ').slice(0, 120)}`)
 

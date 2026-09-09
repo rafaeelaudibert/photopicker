@@ -192,16 +192,58 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .preview { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage); }
 
 .preview-stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
   place-items: center;
   padding: 20px;
-  overflow: auto;
+  /* Fitting the whole frame in the pane is the default, and it must never
+     scroll to do it. Only actual size, which the user asks for, scrolls. */
+  overflow: hidden;
 }
-.preview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
-.preview-stage.actual { place-items: start; }
+.preview-stage img {
+  /* min-*: 0 because a centred grid item keeps its automatic minimum size,
+     which stops max-height from shrinking a tall photo. */
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  cursor: zoom-in;
+}
+.preview-stage.actual { place-items: start; overflow: auto; }
 .preview-stage.actual img { max-width: none; max-height: none; cursor: zoom-out; }
+
+/* Says the frame on screen is not the real one yet, so a fast scrub through a
+   shoot reads as waiting rather than as blurry photos. */
+.stage-note {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  background: rgba(11, 10, 9, 0.78);
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--dim);
+  pointer-events: none;
+}
+.stage-note::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brass);
+  animation: stage-pulse 1s ease-in-out infinite;
+}
+@keyframes stage-pulse {
+  50% { opacity: 0.2; }
+}
 .preview-blank { color: var(--faint); font-size: 13px; }
 
 .preview-bar {
@@ -442,5 +484,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .toast .label { color: var(--brass); }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition-duration: 0.01ms !important; }
+  * { transition-duration: 0.01ms !important; animation: none !important; }
 }

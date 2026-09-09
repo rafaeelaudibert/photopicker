@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DEFAULT_FIELDS, FIELDS, formatBytes, readExif, type FieldId } from './exif'
+import { loadFrame, peekFrame, type Frame } from './frames'
 import { KEY } from './shortcut-list'
+import { getCached } from './thumbs'
 import type { PhotoItem } from './types'
+
+/** How long the cursor has to sit still before the full frame is fetched. At
+ *  key repeat speed every photo passed would otherwise cost a file read and a
+ *  full decode, all of them thrown away before they finished. */
+const SETTLE_MS = 90
 
 interface Props {
   item: PhotoItem | undefined
@@ -20,45 +27,77 @@ interface Props {
 /** The working frame: full resolution, EXIF underneath, no chrome on the image itself. */
 export function Preview(p: Props) {
   const { item } = p
-  const [url, setUrl] = useState<string>()
-  const [file, setFile] = useState<File>()
-  const [exif, setExif] = useState<Partial<Record<FieldId, string>>>({})
-  const [dimensions, setDimensions] = useState<string>()
+  const [src, setSrc] = useState<string>()
+  const [frame, setFrame] = useState<Frame>()
+  const [exif, setExif] = useState<{ key: string; data: Partial<Record<FieldId, string>> }>({
+    key: '',
+    data: {},
+  })
+  const [rows, setRows] = useState<FieldId[]>([])
   const [actualSize, setActualSize] = useState(false)
   const [editingFields, setEditingFields] = useState(false)
 
   useEffect(() => {
-    if (!item) return
+    if (!item) {
+      setSrc(undefined)
+      setFrame(undefined)
+      return
+    }
     let stale = false
-    let objectUrl: string | undefined
     setActualSize(false)
-    setDimensions(undefined)
-    setExif({})
 
-    item.handle.getFile().then((f) => {
-      if (stale) return
-      objectUrl = URL.createObjectURL(f)
-      setFile(f)
-      setUrl(objectUrl)
-      readExif(f).then((data) => !stale && setExif(data))
-    })
+    const ready = peekFrame(item.key)
+    if (ready) {
+      setSrc(ready.url)
+      setFrame(ready)
+    } else {
+      // Paint the grid thumbnail at once. It is soft, but it is this photo, so
+      // the stage is never blank while the real frame is on its way.
+      setSrc(getCached(item.key))
+      setFrame(undefined)
+    }
+
+    const settle = setTimeout(
+      () => {
+        loadFrame(item).then((next) => {
+          if (stale) return
+          setSrc(next.url)
+          setFrame(next)
+          readExif(next.file).then((data) => !stale && setExif({ key: item.key, data }))
+        }, () => {})
+      },
+      ready ? 0 : SETTLE_MS,
+    )
 
     return () => {
       stale = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-      setUrl(undefined)
+      clearTimeout(settle)
     }
   }, [item])
 
+  const showing = !!item && !!frame && frame.url === src
+  const settled = showing && exif.key === item.key
+
   const values = useMemo<Partial<Record<FieldId, string>>>(
     () => ({
-      ...exif,
-      dimensions,
-      size: file ? formatBytes(file.size) : undefined,
+      ...(item && exif.key === item.key ? exif.data : {}),
+      dimensions: showing ? `${frame.width} × ${frame.height}` : undefined,
+      size: showing ? formatBytes(frame.file.size) : undefined,
       path: item?.key,
     }),
-    [exif, dimensions, file, item],
+    [exif, frame, showing, item],
   )
+
+  /** Which rows the strip lays out. Only refreshed once the photo has fully
+   *  arrived, so navigating blanks the values in place rather than collapsing
+   *  the strip and shifting the frame above it. */
+  useEffect(() => {
+    if (!settled) return
+    const next = FIELDS.filter((f) => p.fields.includes(f.id) && values[f.id]).map((f) => f.id)
+    setRows((prev) =>
+      prev.length === next.length && prev.every((id, i) => id === next[i]) ? prev : next,
+    )
+  }, [settled, values, p.fields])
 
   const toggleField = (id: FieldId) =>
     p.onFieldsChange(
@@ -75,7 +114,7 @@ export function Preview(p: Props) {
     )
   }
 
-  const shown = FIELDS.filter((f) => p.fields.includes(f.id) && values[f.id])
+  const shown = FIELDS.filter((f) => rows.includes(f.id))
 
   return (
     <section className="preview">
@@ -84,16 +123,8 @@ export function Preview(p: Props) {
         onClick={() => setActualSize((v) => !v)}
         title={actualSize ? 'Click to fit' : 'Click for actual size'}
       >
-        {url && (
-          <img
-            src={url}
-            alt={item.name}
-            draggable={false}
-            onLoad={(e) =>
-              setDimensions(`${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight}`)
-            }
-          />
-        )}
+        {src && <img src={src} alt={item.name} draggable={false} />}
+        {!showing && <div className="stage-note">Loading full size</div>}
       </div>
 
       <footer className="preview-bar">
@@ -151,12 +182,14 @@ export function Preview(p: Props) {
               {shown.map((f) => (
                 <div key={f.id} className="info-row">
                   <dt className="label">{f.label}</dt>
-                  <dd>{values[f.id]}</dd>
+                  <dd>{values[f.id] ?? ''}</dd>
                 </div>
               ))}
             </dl>
           ) : (
-            <span className="info-empty">No EXIF recorded in this file.</span>
+            <span className="info-empty">
+              {settled ? 'No EXIF recorded in this file.' : ''}
+            </span>
           )}
 
           <button type="button" className="info-edit" onClick={() => setEditingFields((v) => !v)}>

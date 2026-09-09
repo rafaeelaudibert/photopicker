@@ -4,6 +4,7 @@ import { Preview } from './Preview'
 import { Shortcuts } from './Shortcuts'
 import { TopBar } from './TopBar'
 import { DEFAULT_FIELDS, type FieldId } from './exif'
+import { prefetchFrames } from './frames'
 import {
   copyToFolder,
   ensureReadPermission,
@@ -118,6 +119,18 @@ export default function App() {
   useEffect(() => {
     setCursor((c) => clamp(c, 0, Math.max(0, view.length - 1)))
   }, [view.length])
+
+  /** Decodes the photos either side of the cursor while the user looks at this
+   *  one, so stepping through a shoot does not wait on a read and a decode each
+   *  time. Held off long enough that the photo on screen gets the disk first. */
+  useEffect(() => {
+    if (!view.length) return
+    const timer = setTimeout(() => {
+      const around = [view[cursor - 2], view[cursor + 2], view[cursor - 1], view[cursor + 1]]
+      prefetchFrames(around.filter((i): i is PhotoItem => !!i))
+    }, 220)
+    return () => clearTimeout(timer)
+  }, [view, cursor])
 
   const toggle = useCallback((key: string) => {
     setPicked((prev) => {
