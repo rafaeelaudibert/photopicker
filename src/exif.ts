@@ -155,14 +155,32 @@ export function embeddedThumbnail(buffer: ArrayBuffer): EmbeddedThumbnail | null
 const ratio = (v: unknown) => (Array.isArray(v) && v[1] ? v[0] / v[1] : undefined)
 const trim = (n: number) => String(Number(n.toFixed(1)))
 
+/** An Exif date is local time with no zone: "2024:03:11 18:02:57". */
+function toEpoch(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined
+  const m = value.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (!m) return undefined
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0)).getTime()
+}
+
 function formatDate(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
-  const m = value.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/)
-  if (!m) return value
-  const date = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])
-  return date.toLocaleString(undefined, {
+  const at = toEpoch(value)
+  if (at === undefined) return value
+  return new Date(at).toLocaleString(undefined, {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
+}
+
+/** The capture time on its own, for ordering the list. Undefined for a photo
+ *  that carries no date, which the caller has to stand in for. */
+export async function readTakenAt(file: File): Promise<number | undefined> {
+  try {
+    const raw = parse(await file.slice(0, 256 * 1024).arrayBuffer())
+    return toEpoch(raw.get(TAG.dateTimeOriginal))
+  } catch {
+    return undefined
+  }
 }
 
 export function formatBytes(bytes: number): string {

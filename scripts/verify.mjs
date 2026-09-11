@@ -235,6 +235,36 @@ await page.waitForTimeout(600)
 const exif = await page.locator('.info').innerText()
 console.log(`ok   exif strip: ${exif.replace(/\n/g, ' | ').slice(0, 120)}`)
 
+// Ordering by date taken reads a capture time out of every file. It must keep
+// the whole list, keep the selection on the photo it was on rather than on a
+// position, and hand the list back untouched when it is switched off again.
+// Only the windowed rows are in the DOM, so the list is read from the top and
+// compared over a fixed prefix.
+const names = async () => {
+  await page.evaluate(() => {
+    document.querySelector('.grid-pane').scrollTop = 0
+  })
+  await page.waitForTimeout(400)
+  return page.evaluate(() => [...document.querySelectorAll('.cell-name')].slice(0, 12).map((e) => e.textContent))
+}
+await page.locator('.cell').nth(2).click()
+await page.waitForTimeout(300)
+const byName = { photo: await page.locator('.preview-name').innerText(), order: await names() }
+
+await page.keyboard.press('S')
+await page.waitForTimeout(500) // let the read start, so its progress is there to wait on
+await page.waitForFunction(() => !document.querySelector('.sort-count'), null, { timeout: 120000 })
+await page.waitForTimeout(600)
+check('date order keeps every photo', (await page.locator('.filter-count').first().innerText()).trim(), total)
+check('date order keeps the selected photo', await page.locator('.preview-name').innerText(), byName.photo)
+console.log(`ok   date order starts at ${(await names())[0]}, name order at ${byName.order[0]}`)
+
+await page.keyboard.press('S')
+await page.waitForTimeout(600)
+check('name order comes back as it was', (await names()).join(','), byName.order.join(','))
+await page.keyboard.press('Home')
+await page.waitForTimeout(400)
+
 await page.locator('.filter').nth(1).click()
 await page.waitForTimeout(400)
 check('picked filter narrows the grid', await page.locator('.cell').count(), 2)

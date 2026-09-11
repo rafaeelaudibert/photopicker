@@ -80,6 +80,16 @@ Change these only with a measurement in hand.
   one bundle working on the dev server, on Pages and from a local `dist`. The worker is
   unaffected either way: `new URL('./thumb.worker.ts', import.meta.url)` resolves against
   the chunk's own URL at runtime.
+- **The list is ordered before it is filtered, not after.** With no filter on, `view` is
+  the ordered array itself, so a pick does not hand the grid a new array and nothing
+  re-renders. Filtering first and ordering after would rebuild the list on every pick.
+- **Capture times are read lazily, once per folder.** Date order needs a `getFile` and an
+  Exif parse per photo, which on 2000 files is seconds, so it only runs when the user
+  asks for that order. A photo with no `DateTimeOriginal` falls back to the file's
+  `lastModified`, which keeps it near its neighbours instead of at the epoch.
+- **Re-ordering has to carry the selection with it.** The cursor is an index, so without
+  `keepKey` in `App.tsx` changing the order would leave it pointing at whatever photo
+  landed in that position.
 - **Shortcuts are declared once, in `shortcut-list.ts`.** Controls label themselves from
   `KEY`, and the `?` sheet lists the same values, so a rebound key cannot leave a stale
   hint printed on a button. Add a shortcut there first, then handle it in `App.tsx`.
@@ -107,7 +117,8 @@ node scripts/verify.mjs      # geometry, picking, EXIF, filters, export
 It asserts tile geometry (the bug above), that the grid really is a window and still
 scrolls the full length of the list, that all three picking gestures work, that picks
 reach `localStorage`, that EXIF parses, that navigating never blanks the stage or shifts
-the EXIF rows, that the fitted stage never scrolls, that filters narrow the list, and that
+the EXIF rows, that the fitted stage never scrolls, that filters narrow the list, that
+date order keeps every photo and keeps the selection on the photo it was on, and that
 export writes the right bytes. Point it at a folder of JPEGs with `PHOTOS=/path/to/folder`.
 
 Generating test photos without a camera:
@@ -116,7 +127,9 @@ Generating test photos without a camera:
 magick -size 1600x1200 plasma:fractal -blur 0x4 -quality 88 out.jpg
 ```
 
-Those carry no EXIF thumbnail, so they do not exercise the quick pass. To check that path
+Those carry neither an EXIF thumbnail nor a date, so they exercise neither the quick
+thumbnail pass nor date ordering: with no `DateTimeOriginal` every file falls back to its
+timestamp, which for a folder generated in one go is already name order. To check that path
 you need files with an IFD1 thumbnail, which means either real camera JPEGs or splicing an
 APP1 segment in by hand. Vary the orientation tag across the set: the quick and full
 passes disagreeing on which way is up is the failure mode worth catching.
@@ -129,7 +142,7 @@ src/
   TopBar.tsx     folder, filters, size, quota counter, export
   Preview.tsx    large frame, pick button, EXIF strip, field chooser
   Cell.tsx       one memoised tile in the window
-  fs.ts          directory scan, permissions, copy out
+  fs.ts          directory scan, permissions, capture times, copy out
   thumbs.ts      worker pool, quick and full LIFO lanes, LRU blob cache
   thumb.worker.ts
   frames.ts      five decoded full frames around the cursor
@@ -137,6 +150,6 @@ src/
   idb.ts         folder handle persistence
 ```
 
-State that outlives a session: picks, target, tile size, pane width and EXIF field choice
-in `localStorage`; the folder handle in IndexedDB. The `localStorage` writes go through
+State that outlives a session: picks, target, tile size, pane width, list order and EXIF
+field choice in `localStorage`; the folder handle in IndexedDB. The `localStorage` writes go through
 `persist()` in `App.tsx`, which defers them to an idle callback and flushes on `pagehide`.

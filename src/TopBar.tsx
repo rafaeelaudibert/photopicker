@@ -1,5 +1,5 @@
 import { KEY } from './shortcut-list'
-import type { Filter } from './types'
+import type { Filter, Sort } from './types'
 
 interface Props {
   folderName: string
@@ -7,10 +7,14 @@ interface Props {
   pickedCount: number
   target: number
   filter: Filter
+  sort: Sort
+  /** Photos dated so far, while the capture times are being read. */
+  dating: number | null
   cellSize: number
   busy: boolean
   onTargetChange: (n: number) => void
   onFilterChange: (f: Filter) => void
+  onSortChange: (s: Sort) => void
   onCellSizeChange: (n: number) => void
   onChangeFolder: () => void
   onExport: () => void
@@ -25,6 +29,11 @@ export function TopBar(p: Props) {
     { id: 'all', text: 'All', count: p.total, key: KEY.all },
     { id: 'picked', text: 'Picked', count: p.pickedCount, key: KEY.picked },
     { id: 'unpicked', text: 'Unpicked', count: p.total - p.pickedCount, key: KEY.unpicked },
+  ]
+
+  const orders: { id: Sort; text: string; title: string }[] = [
+    { id: 'name', text: 'Name', title: 'Order by file name, folder by folder' },
+    { id: 'taken', text: 'Date taken', title: 'Order by the time the photo was taken' },
   ]
 
   return (
@@ -50,6 +59,25 @@ export function TopBar(p: Props) {
             <kbd className="kbd">{t.key}</kbd>
             {t.text}
             <span className="filter-count">{t.count}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="sorts" role="group" aria-label="Order photos">
+        <kbd className="kbd">{KEY.sort}</kbd>
+        {orders.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            className="sort"
+            aria-pressed={p.sort === o.id}
+            title={o.title}
+            onClick={() => p.onSortChange(o.id)}
+          >
+            {o.text}
+            {o.id === 'taken' && p.dating !== null && (
+              <span className="sort-count">{p.dating}</span>
+            )}
           </button>
         ))}
       </div>

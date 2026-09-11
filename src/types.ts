@@ -9,3 +9,5 @@ export interface PhotoItem {
 }
 
 export type Filter = 'all' | 'picked' | 'unpicked'
+
+export type Sort = 'name' | 'taken'

@@ -93,6 +93,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .filter-count { font-family: var(--mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .filter[aria-pressed='true'] .filter-count { color: var(--brass); }
 
+/* Same segmented shape as the filters, with one key for the pair: S swaps them. */
+.sorts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 2px 2px 8px;
+  background: var(--raised);
+  border-radius: 6px;
+  flex: none;
+}
+.sorts .kbd { margin-right: 6px; }
+
+.sort {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+  transition: background 120ms, color 120ms;
+}
+.sort:hover { color: var(--bone); }
+.sort[aria-pressed='true'] { background: var(--sheet); color: var(--bone); }
+.sort-count { font-family: var(--mono); font-size: 10.5px; color: var(--brass); font-variant-numeric: tabular-nums; }
+
 .zoom {
   width: 88px;
   height: 3px;

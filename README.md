@@ -51,9 +51,15 @@ the `/photopicker/` project path and from a `dist` folder opened directly.
 3. **Work through the grid.** The selected photo shows full size on the left with its
    EXIF underneath. The counter tracks picks against the target and turns rust when you
    go over.
-4. **Narrow down.** Switch to the `Picked` filter for a second pass and unpick until you
+4. **Order them how you think.** The grid starts in name order, folder by folder.
+   Switch it to `Date taken` and the shoot runs in the order you shot it, across
+   subfolders, which is what you want when the same afternoon landed in three of them.
+   The capture times are read out of the files the first time you ask for that order, so
+   a large folder takes a moment; the count next to the button says how far it has got.
+   A photo with no EXIF date falls back to the file's own timestamp. The choice persists.
+5. **Narrow down.** Switch to the `Picked` filter for a second pass and unpick until you
    hit the number. The `Unpicked` filter shows what you have not judged yet.
-5. **Copy them out.** The button writes the picked files into a folder you choose.
+6. **Copy them out.** The button writes the picked files into a folder you choose.
    Originals are never moved or modified.
 
 Your picks are saved as you go, keyed to the folder name, so you can close the tab and
@@ -71,6 +77,7 @@ come back to a half-finished cull. `Resume` reopens the last folder without re-p
 | `Esc` | Leave fullscreen |
 | `I` | Show or hide the EXIF strip |
 | `1` `2` `3` | All / Picked / Unpicked |
+| `S` | Order by name or date taken |
 | `?` | The full shortcut list |
 
 In the grid, click selects, double-click picks, and the badge in a tile's corner picks
@@ -104,8 +111,8 @@ preview.
 
 ## How it works
 
-- `src/fs.ts` walks the directory handle, and copies picked files with `createWritable`,
-  five at a time.
+- `src/fs.ts` walks the directory handle, reads capture times when you ask for date
+  order, and copies picked files with `createWritable`, five at a time.
 - `src/thumbs.ts` runs a pool of web workers that decode and downscale thumbnails off the
   main thread. Requests are served last-in-first-out so whatever you just scrolled to is
   decoded first. Each photo is thumbnailed twice: the camera's own thumbnail out of the

@@ -6,21 +6,24 @@ import { TopBar } from './TopBar'
 import { DEFAULT_FIELDS, type FieldId } from './exif'
 import { clearFrames, prefetchFrames } from './frames'
 import {
+  compareNames,
   copyToFolder,
   ensureReadPermission,
   pickDestFolder,
   pickSourceFolder,
+  readTakenTimes,
   scanFolder,
   supportsFileSystemAccess,
 } from './fs'
 import { clearHandle, loadHandle, saveHandle } from './idb'
 import { resetThumbs } from './thumbs'
-import type { Filter, PhotoItem } from './types'
+import type { Filter, PhotoItem, Sort } from './types'
 
 const picksKey = (folder: string) => `photopicker:picks:${folder}`
 const TARGET_KEY = 'photopicker:target'
 const SIZE_KEY = 'photopicker:cellsize'
 const WIDTH_KEY = 'photopicker:gridwidth'
+const SORT_KEY = 'photopicker:sort'
 const FIELDS_KEY = 'photopicker:fields'
 
 /** Must match .grid in styles.css: the row window is arithmetic, not measurement. */
@@ -37,6 +40,7 @@ const indexOfCell = (target: EventTarget) => {
   return el?.dataset.index ? Number(el.dataset.index) : -1
 }
 const readNumber = (key: string, fallback: number) => Number(localStorage.getItem(key)) || fallback
+const readSort = (): Sort => (localStorage.getItem(SORT_KEY) === 'taken' ? 'taken' : 'name')
 
 /** Writing to localStorage is synchronous and lands on whatever the browser is
  *  in the middle of, which for picks is a keystroke and for the divider is a
@@ -84,6 +88,9 @@ export default function App() {
   const [gridWidth, setGridWidth] = useState(() => readNumber(WIDTH_KEY, 460))
   const [fields, setFields] = useState<FieldId[]>(readFields)
   const [filter, setFilter] = useState<Filter>('all')
+  const [sort, setSort] = useState<Sort>(readSort)
+  const [takenAt, setTakenAt] = useState<Map<string, number>>(new Map())
+  const [dating, setDating] = useState<number | null>(null)
   const [cursor, setCursor] = useState(0)
   const [layout, setLayout] = useState({ cols: 1, row: 0, height: 0, first: 0, last: 0 })
   const [showInfo, setShowInfo] = useState(true)
@@ -91,11 +98,14 @@ export default function App() {
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [scanning, setScanning] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ label: string; text: string } | null>(null)
+  const [toast, setToast] = useState<{ label: string; text: string; sticky?: boolean } | null>(null)
   const [resumable, setResumable] = useState<FileSystemDirectoryHandle | null>(null)
 
   const paneRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  /** The photo the cursor is on, so re-ordering the list can put it back. */
+  const selectedKey = useRef<string | undefined>(undefined)
+  const keepKey = useRef<string | undefined>(undefined)
   const supported = supportsFileSystemAccess()
 
   useEffect(() => {
@@ -105,6 +115,7 @@ export default function App() {
   useEffect(() => persist(TARGET_KEY, String(target)), [target])
   useEffect(() => persist(SIZE_KEY, String(cellSize)), [cellSize])
   useEffect(() => persist(WIDTH_KEY, String(gridWidth)), [gridWidth])
+  useEffect(() => persist(SORT_KEY, sort), [sort])
   useEffect(() => persist(FIELDS_KEY, JSON.stringify(fields)), [fields])
 
   useEffect(() => {
@@ -112,7 +123,7 @@ export default function App() {
   }, [picked, folderName])
 
   useEffect(() => {
-    if (!toast || busy) return
+    if (!toast || busy || toast.sticky) return
     const t = setTimeout(() => setToast(null), 5000)
     return () => clearTimeout(t)
   }, [toast, busy])
@@ -132,6 +143,7 @@ export default function App() {
       setItems(found)
       setFolderName(handle.name)
       setPicked(new Set(stored.filter((k) => valid.has(k))))
+      setTakenAt(new Map())
       setFilter('all')
       setCursor(0)
       await saveHandle(handle).catch(() => {})
@@ -148,11 +160,63 @@ export default function App() {
     }
   }, [openFolder])
 
+  /** Ordering before filtering, so that with no filter on the list handed to
+   *  the grid keeps its identity across a pick and nothing re-renders. */
+  const ordered = useMemo(() => {
+    if (sort === 'name' || !takenAt.size) return items
+    return [...items].sort(
+      (a, b) => (takenAt.get(a.key) ?? 0) - (takenAt.get(b.key) ?? 0) || compareNames(a, b),
+    )
+  }, [items, sort, takenAt])
+
   const view = useMemo(() => {
-    if (filter === 'picked') return items.filter((i) => picked.has(i.key))
-    if (filter === 'unpicked') return items.filter((i) => !picked.has(i.key))
-    return items
-  }, [items, filter, picked])
+    if (filter === 'picked') return ordered.filter((i) => picked.has(i.key))
+    if (filter === 'unpicked') return ordered.filter((i) => !picked.has(i.key))
+    return ordered
+  }, [ordered, filter, picked])
+
+  selectedKey.current = view[cursor]?.key
+
+  /** Capture times cost a read per photo, so they are only fetched when the
+   *  user asks for that order, and once per folder. */
+  useEffect(() => {
+    if (sort !== 'taken' || !items.length || takenAt.size) return
+    const run = new AbortController()
+    setDating(0)
+    readTakenTimes(items, setDating, run.signal)
+      .then((times) => {
+        if (run.signal.aborted) return
+        keepKey.current = selectedKey.current
+        setTakenAt(times)
+      })
+      .finally(() => !run.signal.aborted && setDating(null))
+    // Switching back to name order mid-read abandons it, so the progress it was
+    // reporting has to go with it.
+    return () => {
+      run.abort()
+      setDating(null)
+    }
+  }, [sort, items, takenAt])
+
+  useEffect(() => {
+    if (dating === null) return setToast((t) => (t?.sticky ? null : t))
+    setToast({ label: 'Reading dates', text: `${dating} of ${items.length}`, sticky: true })
+  }, [dating, items.length])
+
+  /** Re-ordering moves every photo, and the cursor is an index. Without this
+   *  changing the order would select whatever landed at the old position. */
+  const changeSort = useCallback((next: Sort) => {
+    keepKey.current = selectedKey.current
+    setSort(next)
+  }, [])
+
+  useEffect(() => {
+    const key = keepKey.current
+    if (key === undefined) return
+    keepKey.current = undefined
+    const found = view.findIndex((i) => i.key === key)
+    if (found >= 0) setCursor(found)
+  }, [view])
 
   useEffect(() => {
     setCursor((c) => clamp(c, 0, Math.max(0, view.length - 1)))
@@ -302,6 +366,9 @@ export default function App() {
         case 'i':
         case 'I':
           return setShowInfo((v) => !v)
+        case 's':
+        case 'S':
+          return changeSort(sort === 'name' ? 'taken' : 'name')
         case '1':
           return setFilter('all')
         case '2':
@@ -313,7 +380,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, cursor, fullscreen, showShortcuts, items.length, toggle, layout.cols])
+  }, [view, cursor, fullscreen, showShortcuts, items.length, toggle, layout.cols, sort, changeSort])
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -428,10 +495,13 @@ export default function App() {
         pickedCount={picked.size}
         target={target}
         filter={filter}
+        sort={sort}
+        dating={dating}
         cellSize={cellSize}
         busy={busy}
         onTargetChange={setTarget}
         onFilterChange={setFilter}
+        onSortChange={changeSort}
         onCellSizeChange={setCellSize}
         onChangeFolder={() => {
           clearHandle().catch(() => {})

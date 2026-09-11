@@ -8,6 +8,7 @@ export const KEY = {
   all: '1',
   picked: '2',
   unpicked: '3',
+  sort: 'S',
   help: '?',
 } as const
 
@@ -22,6 +23,7 @@ export const KEYS: { keys: string[]; label: string }[] = [
   { keys: [KEY.all], label: 'Show all photos' },
   { keys: [KEY.picked], label: 'Show only picked' },
   { keys: [KEY.unpicked], label: 'Show only unpicked' },
+  { keys: [KEY.sort], label: 'Order by name or date taken' },
   { keys: [KEY.help], label: 'Open this list' },
 ]
 
